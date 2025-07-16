@@ -1,0 +1,85 @@
+StrokeGPT - v1.3 Manual & Features Guide
+
+Thanks for checking out StrokeGPT! This guide will show you how to use it and what cool stuff it can do.
+HOW TO USE STROKEGPT
+
+Once the app is open in your browser, you'll see two parts. The big part on the left is for chatting, and the right side is where all your settings are.
+First Things First:
+
+    Put in Your Handy Key: On the right side, find the "Handy Settings" box.
+    Type or paste your Handy key in there and click "Set".
+    The message at the bottom will tell you when it's connected.
+    Tell it About Your Partner: In the "Persona Settings" box, type in what kind of AI partner you want (like "dominant CEO," "shy catgirl," or "a sentient but flirty potato waffle") and click "Set Persona".
+    The AI will change how it talks and acts based on this.
+    Set Up Sound (Optional): If you want the AI to talk to you, go to the "Audio Settings" box.
+    Put in your ElevenLabs API Key, click "Set Key" to load voices, then pick a voice and tick the "Enable Audio" box.
+    Start Talking: Type something in the chat box at the very bottom and hit "Send" or Enter.
+Available Buttons & Commands (in the Sidebar):
+
+    "Take Over" / Auto Mode: Click "Take Over" in the "Actions" panel to have the AI start doing its own thing, making up strokes as it goes.
+    "My Turn" / Manual Mode: To make the AI stop moving and let you control it again, click "My Turn".
+    "Like" Button (👍): When the AI is controlling the Handy, clicking this tells it you liked what it just did.
+    It will then figure out what that move was, give it a name, and save it so it can do it again later.
+    "Memories: ON/OFF" Button: This turns the AI's long-term memory on or off. If it's OFF, the AI won't remember your old chats.
+    Max Depth Slider: Use this slider in the "Depth Control" area to put a hard stop on how deep the Handy can go.
+    The AI will know what "deep" means based on what you set here.
+
+"Milk Me" Button: To start the super-intense, climax-focused mode, hit the "Milk Me" button in the "Danger Zone" at the bottom.
+"STOP" Button: This button, also in the "Danger Zone", will make the Handy stop moving right away.
+MAIN FEATURES
+
+1. The Smart Mood Engine
+
+    What it is: The AI can feel and express over 17 different emotions (like "Anticipatory," "Dominant," "Vulnerable").
+    How it works: It doesn't just look for words. The AI is taught to read between the lines—your punctuation (!!!), capital letters (ALL CAPS), repeated words, and even if you sound out of breath (ah... ah...).
+    Why it's cool: This lets the AI understand your unspoken feelings.
+    It can tell if you're getting excited and get more Passionate, or if you're holding back and become more Gentle, making the whole experience feel more real.
+2. The "Dancer" Auto Mode
+
+    What it is: The main "Take Over" mode just makes up new moves as it goes; it's not following a script.
+    How it works: The AI's mood right now directly changes the speed and depth of the Handy in real-time.
+    It's literally making up a unique "dance" based on how it feels at that moment.
+    Why it's cool: Every time you use it, the stroking will be completely fresh and different.
+3. The Self-Learning System
+
+    What it is: The "Like" button is a powerful way to teach the AI which moves you like.
+    How it works: When you click "Like" on a move, the AI thinks about why that move was good.
+    It gives the move a cool name, figures out its settings, and saves it as a new, permanent pattern.
+    Why it's cool: The AI gets better at pleasing you over time.
+    It builds its own special list of moves just for you.
+4. Advanced In-Session Memory
+
+    What it is: The AI won't forget things that just happened.
+    How it works: As you chat more, the app automatically writes quick summaries of the oldest parts of your conversation in the background.
+    The AI then reads these summaries, so it always knows what happened earlier in your chat.
+    Why it's cool: You can have really long chats, and the AI will remember important stuff from the start to the end.
+THINGS IT CAN'T DO (Known Limitations)
+
+    This is an early version! You might still find bugs.
+    If the AI acts weird, hit that "STOP" button.
+    The AI runs on your computer, so how fast it responds depends 100% on your PC's hardware.
+    The AI can't look at pictures or browse the internet.
+
+    EVERYTHING THE AI SAYS IS MADE UP.
+    Its memory between sessions is based on summaries. It will remember the main ideas of past chats but might forget small, specific details.
+QUICK TROUBLESHOOTING
+
+    "The AI is responding very slowly or I get a 'Read Timeout' error."
+    This usually means the Ollama AI is using your computer's main processor (CPU) instead of your graphics card (GPU).
+    Your GPU is much, much faster. It's often an NVIDIA driver problem, but the easiest fix is to just make the app wait longer.
+    Open app.py in a text editor.
+
+        Look for timeout=60.
+
+        Change it to timeout=180.
+    This tells the app to wait 3 minutes instead of 1, which is usually enough time for a CPU.
+    "The AI seems 'dumb' or refuses to talk about certain topics."
+    This app is designed to work best with modern, uncensored models.
+    Make sure you have downloaded the recommended
+
+    llama3:8b-instruct-q4_K_M model in Ollama.
+
+"The app crashed or is frozen."
+Just go back to that black server window, close it (or press
+
+Ctrl+C), and start the server again by typing python app.py.

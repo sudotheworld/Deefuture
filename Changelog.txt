@@ -1,0 +1,20 @@
+v1.2 - Fixed AI Depth Understanding: Made it so "tip," "mid," and "deep" strokes actually mean the right thing no matter your Max Depth setting.
+Fixed AI Speed Perception: Told the AI exactly what "slow," "medium," and "fast" speeds are in numbers so it controls the Handy better.
+Removed Unnecessary Speed Cap: Changed how the Handy moves so it can go faster even at shallow depths, for more fun teasing.
+Introduced Max Depth Limiter:
+    Added a "Max Depth" slider on the screen for you to set how far the Handy goes.
+    Built in some code to remember your Max Depth setting even when you close the app.
+    Most importantly, put a hard limit in the Handy control code to make sure it NEVER goes past your Max Depth, no matter what the AI tries to do.
+Resolved UI Interactivity Issues: Fixed some messed-up code in index.html so all the buttons and sliders work right.
+Fixed Preference Saving Errors: Fixed problems that stopped your settings from saving when you closed the app.
+v1.2 - The Ergonomics & Audio Update
+
+- New Feature: ElevenLabs Integration: Added full voice support using ElevenLabs, with settings for your API key and picking voices in a new "Audio Settings" area.
+- New Feature: Advanced In-Session Memory: Added a smart way for the AI to remember what's happening during your chat without slowing your computer down.
+I lost a few braincells getting this working :/
+- UI Overhaul: Made the whole app look new with a two-column design, putting all the settings on the side so the chat window is bigger.
+- Model Recommendation Update: Now recommending llama3:8b-instruct-q4_K_M for the AI, because it's way faster and better at understanding what you want.
+v1.2.5 - Depth Adherence & Stability Hotfix
+
+- Fixed AI Depth Adherence: Made the AI's instructions super clear with examples for "tip," "mid," and "deep" based on your Max Depth setting.
+- It finally understands WHAT MAX DEPTH MEANS! :D

@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Handy AI Chat</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #282a36;
+            color: #f8f8f2;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: row;
+        }
+
+        #main-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            border-right: 1px solid #44475a;
+        }
+
+        #sidebar {
+            width: 300px;
+            flex-shrink: 0;
+            padding: 15px;
+            background-color: #383a59;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #top-bar {
+            padding: 15px;
+            background-color: #44475a;
+            border-bottom: 1px solid #6272a4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #top-bar h1 { margin: 0; font-size: 1.5rem; color: #8be9fd; }
+        #mood-display {
+            background-color: #44475a;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            border: 1px solid #6272a4;
+        }
+
+        #chat-view {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #bottom-input-area {
+            padding: 15px;
+            border-top: 1px solid #6272a4;
+            background-color: #44475a;
+        }
+
+        .chat-message-container {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+        .message-bubble {
+            max-width: 80%;
+            padding: 10px;
+            border-radius: 10px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .bot-bubble .message-bubble {
+            background-color: #343746;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+        .user-bubble .message-bubble {
+            background-color: #505260;
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+        .speaker-name {
+            font-size: 0.8em;
+            margin-bottom: 3px;
+            color: #bd93f9;
+        }
+        .user-bubble .speaker-name { text-align: right; }
+
+        #visualizer-box {
+            height: 40px;
+            background-color: #383a59;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px solid #6272a4;
+        }
+
+        .setting-section {
+            border: 1px solid #6272a4;
+            border-radius: 6px;
+            padding: 10px;
+            background-color: #282a36;
+        }
+        .setting-section h3 {
+            margin-top: 0; margin-bottom: 10px; font-size: 1.1rem;
+            color: #8be9fd;
+            border-bottom: 1px solid #6272a4;
+            padding-bottom: 5px;
+        }
+
+        .my-button {
+            padding: 8px 12px;
+            border: none;
+            background-color: #6272a4;
+            color: #f8f8f2;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 1em;
+            width: 100%;
+        }
+        .my-button:hover { background-color: #7887ab; }
+        .my-button:active { transform: scale(0.98); }
+
+        .input-text, .select-box {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #6272a4;
+            background-color: #343746;
+            color: #f8f8f2;
+            border-radius: 4px;
+            font-size: 1em;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #message-input-line {
+            display: flex;
+            gap: 10px;
+        }
+        #message-input-line .my-button { width: auto; flex-shrink: 0; }
+
+        .sidebar-button.milking { background-color: #ff79c6; }
+        .sidebar-button.stop { background-color: #ff5555; }
+        .sidebar-button.milking:hover { background-color: #ff92d0; }
+        .sidebar-button.stop:hover { background-color: #ff6e6e; }
+
+        .slider-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+        .slider-control label, .audio-toggle-line label { white-space: nowrap; font-size: 0.95em; }
+        .slider-control input[type="range"] {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            height: 8px;
+            background: #44475a;
+            border-radius: 4px;
+            outline: none;
+            opacity: 0.9;
+        }
+        .slider-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #bd93f9;
+            cursor: pointer;
+            border: 2px solid #f8f8f2;
+            box-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+        .slider-control #currentDepthDisplay {
+            min-width: 40px;
+            text-align: right;
+            font-weight: bold;
+            color: #ffb86c;
+        }
+        .audio-toggle-line { display: flex; align-items: center; gap: 8px; }
+
+        #status-text { margin-top: 10px; font-size: 0.9em; text-align: center; color: #bd93f9; }
+    </style>
+</head>
+<body>
+    <div id="main-area">
+        <div id="top-bar">
+            <h1>My Handy AI Chat</h1>
+            <div id="mood-display">Mood: ...</div>
+        </div>
+
+        <div id="chat-view">
+            <div id="chat-messages-container"></div>
+        </div>
+
+        <div id="bottom-input-area">
+            <div id="visualizer-box">
+                <canvas id="rhythm-canvas"></canvas>
+            </div>
+            <div id="status-text">Status: Waiting for Handy Key.</div>
+            <div id="message-input-line">
+                <input type="text" id="user-chat-input" class="input-text" placeholder="Type a message or command...">
+                <button id="send-chat-btn" class="my-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div class="setting-section">
+            <h3>Handy Setup</h3>
+            <input type="password" id="handy-key-input" class="input-text" placeholder="Enter Handy Key">
+            <button id="save-handy-key-btn" class="my-button">Set Key</button>
+        </div>
+
+        <div class="setting-section">
+            <h3>My Persona</h3>
+            <input type="text" id="persona-description-input" class="input-text" placeholder="Describe my partner...">
+            <button id="set-persona-button" class="my-button">Set Persona</button>
+        </div>
+
+        <div class="setting-section">
+            <h3>Voice Output (ElevenLabs)</h3>
+            <input type="password" id="elevenlabs-key-input" class="input-text" placeholder="ElevenLabs API Key">
+            <button id="set-elevenlabs-key-button" class="my-button">Set Key</button>
+            <select id="elevenlabs-voice-select-box" class="select-box" disabled><option>Set API Key to load voices...</option></select>
+            <div class="audio-toggle-line">
+                <input type="checkbox" id="enable-audio-checkbox">
+                <label for="enable-audio-checkbox">Enable Audio</label>
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <h3>Control Actions</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button id="start-auto-btn" class="my-button" style="flex: 1;">Start Auto</button>
+                <button id="stop-auto-btn" class="my-button" style="flex: 1;">Stop Auto</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="like-this-move-btn" class="my-button" style="flex: 1;">👍 Like</button>
+                <button id="toggle-memory-btn" class="my-button" style="flex: 1;">Memories: ON</button>
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <h3>Depth Limit</h3>
+            <div class="slider-control">
+                <label for="max-depth-slider-input">Max Depth:</label>
+                <input type="range" id="max-depth-slider-input" min="10" max="100" value="100">
+                <span id="currentDepthDisplay">100%</span>
+            </div>
+        </div>
+
+        <div class="setting-section" style="margin-top: auto;">
+            <h3>DANGER ZONE</h3>
+            <button id="milking-mode-btn" class="my-button sidebar-button milking" style="margin-bottom: 10px;">Milk Me</button>
+            <button id="emergency-stop-all-btn" class="my-button sidebar-button stop">STOP EVERYTHING</button>
+        </div>
+    </div>
+
+    <script>
+        const chatView = document.getElementById('chat-view');
+        const chatMessagesContainer = document.getElementById('chat-messages-container');
+        const userChatInput = document.getElementById('user-chat-input');
+        const sendChatBtn = document.getElementById('send-chat-btn');
+        const startAutoBtn = document.getElementById('start-auto-btn');
+        const stopAutoBtn = document.getElementById('stop-auto-btn');
+        const likeThisMoveBtn = document.getElementById('like-this-move-btn');
+        const handyKeyInput = document.getElementById('handy-key-input');
+        const saveHandyKeyBtn = document.getElementById('save-handy-key-btn');
+        const statusText = document.getElementById('status-text');
+        const moodDisplay = document.getElementById('mood-display');
+        const rhythmCanvas = document.getElementById('rhythm-canvas');
+        const ctx = rhythmCanvas.getContext('2d');
+        const personaDescriptionInput = document.getElementById('persona-description-input');
+        const setPersonaButton = document.getElementById('set-persona-button');
+        const emergencyStopAllBtn = document.getElementById('emergency-stop-all-btn');
+        const milkingModeBtn = document.getElementById('milking-mode-btn');
+        const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
+        const maxDepthSliderInput = document.getElementById('max-depth-slider-input');
+        const currentDepthDisplay = document.getElementById('currentDepthDisplay');
+        const elevenLabsKeyInput = document.getElementById('elevenlabs-key-input');
+        const setElevenLabsKeyButton = document.getElementById('set-elevenlabs-key-button');
+        const elevenlabsVoiceSelectBox = document.getElementById('elevenlabs-voice-select-box');
+        const enableAudioCheckbox = document.getElementById('enable-audio-checkbox');
+
+        let myHandyKey = '';
+        let myPersonaDescription = 'An energetic and passionate girlfriend';
+        let isMemoriesEnabled = true;
+        let currentMaxHandyDepth = 100;
+        let isAudioPlaying = false;
+        let audioPlaybackQueue = [];
+        let isPollingUpdates = false;
+
+        function resizeCanvas() {
+            if (!rhythmCanvas.parentElement) return;
+            rhythmCanvas.width = rhythmCanvas.parentElement.clientWidth;
+            rhythmCanvas.height = rhythmCanvas.parentElement.clientHeight;
+        }
+
+        function drawHandyVisualizer(speed, depth) {
+            const width = rhythmCanvas.width;
+            const height = rhythmCanvas.height;
+            const barHeight = (height / 2) - 5;
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.font = "12px sans-serif";
+
+            ctx.fillStyle = 'rgba(255, 85, 85, 0.3)'; // Redish for speed
+            ctx.fillRect(0, 0, width, barHeight);
+            ctx.fillStyle = '#ff5555';
+            ctx.fillRect(0, 0, (speed / 100) * width, barHeight);
+            ctx.fillStyle = 'white';
+            ctx.fillText(`Speed: ${speed}%`, 5, barHeight / 2 + 5);
+
+            ctx.fillStyle = 'rgba(255, 184, 108, 0.3)'; // Orangeish for depth
+            ctx.fillRect(0, height / 2 + 5, width, barHeight);
+            const displayedDepth = Math.min(depth, currentMaxHandyDepth);
+            ctx.fillStyle = '#ffb86c';
+            ctx.fillRect(0, height / 2 + 5, (displayedDepth / 100) * width, barHeight);
+            ctx.fillStyle = 'white';
+            ctx.fillText(`Depth: ${displayedDepth}%`, 5, height - (barHeight/2) + 5);
+        }
+
+        function addChatMessage(sender, text) {
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('chat-message-container', sender === 'BOT' ? 'bot-bubble' : 'user-bubble');
+            const senderNameP = document.createElement('p');
+            senderNameP.classList.add('speaker-name');
+            senderNameP.textContent = sender;
+            const messageBubble = document.createElement('p');
+            messageBubble.classList.add('message-bubble');
+            messageBubble.textContent = text;
+            messageContainer.appendChild(senderNameP);
+            messageContainer.appendChild(messageBubble);
+            chatMessagesContainer.appendChild(messageContainer);
+            chatView.scrollTop = chatView.scrollHeight;
+        }
+
+        async function sendUserMessage(message) {
+            if (!myHandyKey) { addChatMessage('BOT', 'Please set your Handy Key first!'); return; }
+            if (message.trim() !== '') {
+                addChatMessage('YOU', message);
+                userChatInput.value = '';
+            }
+            try {
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, key: myHandyKey, persona_desc: myPersonaDescription })
+                });
+                if (!response.ok) { addChatMessage('BOT', `Server had an error: ${response.status}`); }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addChatMessage('BOT', 'Error: Cannot connect to the server.');
+            }
+        }
+
+        async function playAudioFromQueue() {
+            if (isAudioPlaying || audioPlaybackQueue.length === 0) {
+                isPollingUpdates = false;
+                return;
+            }
+            isPollingUpdates = true;
+            isAudioPlaying = true;
+
+            const audioBlob = audioPlaybackQueue.shift();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+            audio.onended = () => {
+                isAudioPlaying = false;
+                URL.revokeObjectURL(audioUrl);
+                playAudioFromQueue();
+            };
+            audio.onerror = () => {
+                console.error("Problem playing audio.");
+                isAudioPlaying = false;
+                URL.revokeObjectURL(audioUrl);
+                playAudioFromQueue();
+            };
+        }
+
+        async function getNewUpdates() {
+            if (isPollingUpdates) return;
+            isPollingUpdates = true;
+            try {
+                const response = await fetch('/get_updates');
+                const contentType = response.headers.get("content-type");
+
+                if (contentType && contentType.indexOf("audio/mpeg") !== -1) {
+                    const audioBlob = await response.blob();
+                    audioPlaybackQueue.push(audioBlob);
+                    playAudioFromQueue();
+                } else {
+                    const data = await response.json();
+                    if (data.messages) {
+                        data.messages.forEach(msg => addChatMessage('BOT', msg));
+                    }
+                    isPollingUpdates = false;
+                }
+            } catch (error) {
+                console.error("Error getting updates:", error);
+                isPollingUpdates = false;
+            }
+        }
+
+        async function getMyStatus() {
+            try {
+                const response = await fetch('/get_status');
+                const data = await response.json();
+                if (data.mood) { moodDisplay.textContent = `Mood: ${data.mood}`; }
+                drawHandyVisualizer(data.speed || 0, data.depth || 0);
+                if (data.max_depth !== undefined && data.max_depth !== null) {
+                    currentMaxHandyDepth = data.max_depth;
+                    maxDepthSliderInput.value = data.max_depth;
+                    currentDepthDisplay.textContent = `${data.max_depth}%`;
+                }
+            } catch (error) {}
+        }
+
+        sendChatBtn.addEventListener('click', () => sendUserMessage(userChatInput.value));
+        userChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendUserMessage(userChatInput.value); } });
+        startAutoBtn.addEventListener('click', () => { sendUserMessage('take over'); });
+        stopAutoBtn.addEventListener('click', async () => {
+            try { await fetch('/stop_auto_mode', { method: 'POST' }); } catch (error) { addChatMessage('BOT', 'Error stopping auto mode.'); }
+        });
+
+        setPersonaButton.addEventListener('click', () => {
+            const newPersona = personaDescriptionInput.value.trim();
+            if (newPersona) {
+                myPersonaDescription = newPersona;
+                sendUserMessage('');
+                addChatMessage('BOT', `New Persona Set: ${newPersona}`);
+            }
+        });
+
+        saveHandyKeyBtn.addEventListener('click', () => {
+            const key = handyKeyInput.value.trim();
+            if (key) {
+                myHandyKey = key;
+                statusText.textContent = 'Status: Handy Key set. Ready to go!';
+                addChatMessage('BOT', 'Handy Key has been set.');
+                fetch('/send_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: '', key: myHandyKey, persona_desc: myPersonaDescription })
+                });
+            }
+        });
+
+        likeThisMoveBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/like_last_move', { method: 'POST' });
+                const data = await response.json();
+                if (data.status === 'learned') {
+                    statusText.textContent = `Cool! Learned a new move: ${data.name}`;
+                    likeThisMoveBtn.classList.add('liked'); // Add a class for visual feedback
+                    setTimeout(() => { likeThisMoveBtn.classList.remove('liked'); }, 500);
+                } else if (data.status === 'failed_to_learn') {
+                    statusText.textContent = "Status: AI couldn't learn that one.";
+                } else {
+                    statusText.textContent = "Status: No active auto move to like.";
+                }
+            } catch (error) {
+                console.error('Error liking move:', error);
+                statusText.textContent = "Status: Error processing like.";
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+            if (e.code === 'Backquote') { // ` key
+                e.preventDefault();
+                likeThisMoveBtn.click();
+            }
+        });
+
+        emergencyStopAllBtn.addEventListener('click', () => {
+            sendUserMessage('stop');
+            statusText.textContent = "Status: EMERGENCY STOP ACTIVATED!";
+        });
+
+        milkingModeBtn.addEventListener('click', async () => {
+            if (!myHandyKey) { addChatMessage('BOT', 'Please set your Handy Key first!'); return; }
+            try {
+                await fetch('/start_milking_mode', { method: 'POST' });
+                statusText.textContent = "Status: Milking mode is ON!";
+            }
+            catch (error) {
+                console.error('Error starting milking mode:', error);
+                addChatMessage('BOT', 'Error: Could not start milking mode.');
+            }
+        });
+
+        toggleMemoryBtn.addEventListener('click', async () => {
+            isMemoriesEnabled = !isMemoriesEnabled;
+            try {
+                const response = await fetch('/toggle_memories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ use_memories: isMemoriesEnabled })
+                });
+                const data = await response.json();
+                toggleMemoryBtn.textContent = data.use_memories ? 'Memories: ON' : 'Memories: OFF';
+                statusText.textContent = `Status: Long-term memory is now ${data.use_memories ? 'ON' : 'OFF'}.`;
+            } catch (error) {
+                console.error('Error toggling memories:', error);
+                isMemoriesEnabled = !isMemoriesEnabled;
+            }
+        });
+
+        maxDepthSliderInput.addEventListener('input', async (e) => {
+            const newMaxDepth = parseInt(e.target.value);
+            currentDepthDisplay.textContent = `${newMaxDepth}%`;
+            currentMaxHandyDepth = newMaxDepth;
+            try {
+                const response = await fetch('/set_max_depth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ max_depth: newMaxDepth })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    statusText.textContent = `Status: Max Depth set to ${data.max_depth}%.`;
+                } else {
+                    statusText.textContent = `Status: Error setting Max Depth: ${data.message}`;
+                }
+            } catch (error) {
+                console.error('Error setting max depth:', error);
+                statusText.textContent = "Status: Error updating max depth.";
+            }
+        });
+
+        setElevenLabsKeyButton.addEventListener('click', async () => {
+            const apiKey = elevenLabsKeyInput.value.trim();
+            if (!apiKey) {
+                statusText.textContent = 'Status: Need an ElevenLabs API key here.';
+                return;
+            }
+            statusText.textContent = 'Status: Checking key and getting voices...';
+            try {
+                const response = await fetch('/setup_elevenlabs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    elevenlabsVoiceSelectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
+                    for (const [name, id] of Object.entries(data.voices)) {
+                        const option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = name;
+                        elevenlabsVoiceSelectBox.appendChild(option);
+                    }
+                    elevenlabsVoiceSelectBox.disabled = false;
+                    statusText.textContent = `Status: Voices loaded! (${Object.keys(data.voices).length} found).`;
+                } else {
+                    statusText.textContent = `Status: ElevenLabs Error - ${data.message}`;
+                }
+            } catch (error) {
+                statusText.textContent = 'Status: Failed to connect to server for ElevenLabs setup.';
+            }
+        });
+
+        async function updateAudioSettings() {
+            const voiceId = elevenlabsVoiceSelectBox.value;
+            const enabled = enableAudioCheckbox.checked;
+            if (!voiceId && enabled) {
+                statusText.textContent = "Status: Select a voice to turn audio on!";
+                enableAudioCheckbox.checked = false;
+                return;
+            }
+            try {
+                await fetch('/set_elevenlabs_voice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voice_id: voiceId, enabled: enabled })
+                });
+                statusText.textContent = `Status: Audio updated. On: ${enabled}`;
+            } catch (error) {
+                statusText.textContent = 'Status: Failed to update audio settings.';
+            }
+        }
+
+        elevenlabsVoiceSelectBox.addEventListener('change', updateAudioSettings);
+        enableAudioCheckbox.addEventListener('change', updateAudioSettings);
+
+        window.addEventListener('resize', resizeCanvas);
+        document.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas();
+            drawHandyVisualizer(0, 100);
+            setInterval(getNewUpdates, 1500);
+            setInterval(getMyStatus, 500);
+            addChatMessage('BOT', "Welcome! Set your Handy key in the sidebar to begin!");
+        });
+    </script>
+</body>
+</html>
