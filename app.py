@@ -7,17 +7,31 @@ import requests
 import threading
 import atexit
 import io
+import re
 from collections import deque
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template_string, send_file
+from flask import Flask, request, jsonify, render_template_string, send_file, send_from_directory
 
 from elevenlabs.client import ElevenLabs
 from elevenlabs import Voice, VoiceSettings
+
+app = Flask(__name__)
 
 HANDY_KEY = ""
 LLM_URL = "http://127.0.0.1:11434/api/chat"
 HANDY_BASE_URL = "https://www.handyfeeling.com/api/handy/v2/"
 USER_PREFS_FILE = Path("my_settings.json")
+
+# --- SAFETY GUARDRAIL: Define the absolute max speed the AI can request ---
+MAX_AI_VELOCITY_PCT = 60
+
+# Handy jogging constants from the README
+FULL_TRAVEL_MM = 110.0
+JOG_STEP_MM = 2.0
+JOG_VELOCITY_MM_PER_SEC = 20.0
+current_mm = 0.0
+min_mm = 0.0
+max_mm = 110.0
 
 STOP_COMMANDS = {"stop", "hold", "halt", "pause", "freeze", "wait"}
 AUTO_ON_WORDS = {"take over", "you drive", "auto mode"}
@@ -29,7 +43,7 @@ old_memories = []
 current_session_thoughts = []
 messages_for_ui = deque()
 last_stroke_speed = 0
-last_depth_pos = 100
+last_depth_pos = 50
 auto_mode_active_task = None
 my_persona = "an energetic and passionate girlfriend"
 my_rules = []
@@ -39,6 +53,7 @@ last_used_pattern = None
 current_mood = "Curious"
 use_long_term_memory = True
 max_handy_depth = 100
+min_handy_depth = 0
 memory_save_lock = threading.Lock()
 
 ELEVENLABS_API_KEY_LOCAL = ""
@@ -47,17 +62,15 @@ audio_output_queue = deque()
 all_available_voices = {}
 audio_is_on = False
 
-app = Flask(__name__)
-
 def make_audio_for_text(text_to_speak):
     global audio_is_on, ELEVENLABS_API_KEY_LOCAL, ELEVENLABS_VOICE_ID_LOCAL
     if not audio_is_on or not ELEVENLABS_API_KEY_LOCAL or not ELEVENLABS_VOICE_ID_LOCAL:
         return
-    if text_to_speak.strip().startswith("(") or text_to_speak.strip().startswith("["):
+    if not text_to_speak or text_to_speak.strip().startswith("(") or text_to_speak.strip().startswith("["):
         return
 
     try:
-        print(f"🎙️ Generating audio: '{text_to_speak[:40]}...'")
+        print(f"🎙️ Generating audio with v2 model: '{text_to_speak[:50]}...'")
         eleven_client = ElevenLabs(api_key=ELEVENLABS_API_KEY_LOCAL)
 
         audio_stream = eleven_client.text_to_speech.convert(
@@ -74,23 +87,84 @@ def make_audio_for_text(text_to_speak):
     except Exception as e:
         print(f"🔥 Oops, ElevenLabs problem: {e}")
 
+def percent_to_mm(val):
+    return FULL_TRAVEL_MM * float(val) / 100.0
+
+def mm_to_percent(val):
+    return int(round((float(val) / FULL_TRAVEL_MM) * 100))
+
+def safe_percent(p):
+    """Clamp a value to the 0-100 range."""
+    try:
+        p = float(p)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(100.0, p))
+
+def depth_percent_to_mm(p):
+    """Convert a depth percentage to millimetres within the user's range."""
+    p = safe_percent(p)
+    return min_mm + (max_mm - min_mm) * (p / 100.0)
+
+def parse_depth_input(dp_input):
+    """Parse depth keywords or percentages into an (mode, value) tuple."""
+    global last_depth_pos
+
+    if dp_input is None:
+        return None
+    if isinstance(dp_input, (int, float)):
+        return ("abs", safe_percent(dp_input))
+
+    text = str(dp_input).strip().lower()
+
+    if text.endswith('%'):
+        try:
+            return ("abs", safe_percent(float(text.rstrip('%'))))
+        except ValueError:
+            pass
+
+    if 'deeper' in text or 'further in' in text or 'all the way in' in text:
+        return ("abs", safe_percent(last_depth_pos + 15))
+    if ('shallower' in text or 'less deep' in text or 'not so deep' in text or
+            'not as deep' in text or 'pull out' in text or 'come out' in text or
+            'pull back' in text):
+        return ("abs", safe_percent(last_depth_pos - 15))
+
+    if ('tip' in text or 'shallow' in text or 'just the tip' in text or
+            'only the tip' in text or 'top' in text or 'entrance' in text):
+        return ("rel", 12.5)
+    if ('middle' in text or 'halfway' in text or text == 'half' or 'mid' in text
+            or 'center' in text):
+        return ("rel", 50.0)
+    if ('base' in text or 'deep' in text or 'full' in text or 'balls deep' in text
+            or 'all the way' in text):
+        return ("rel", 87.5)
+
+    try:
+        return ("abs", safe_percent(float(text)))
+    except ValueError:
+        return None
+
 def load_my_settings():
-    global my_patterns, milking_patterns, old_memories, my_rules, my_persona, max_handy_depth
+    global my_patterns, milking_patterns, old_memories, my_rules, my_persona, max_handy_depth, min_handy_depth, min_mm, max_mm
     my_patterns_defaults = [
         {"name": "Just the Tip", "sp_range": (5, 15), "dp_range": (5, 15), "talk": "Just the very tip... seeing how you react...", "score": 0, "moods": ["Curious", "Teasing"]},
         {"name": "Gentle Tease", "sp_range": (10, 25), "dp_range": (15, 40), "talk": "Just a gentle, slow tease to get you ready.", "score": 0, "moods": ["Teasing", "Playful"]},
         {"name": "Slow Exploration", "sp_range": (15, 30), "dp_range": (30, 70), "talk": "Exploring you slowly... learning your every inch.", "score": 0, "moods": ["Curious", "Loving"]},
-        {"name": "Deep & Deliberate", "sp_range": (20, 40), "dp_range": (80, 100), "talk": "Mmm, so deep and deliberate. I love this feeling.", "score": 0, "moods": ["Loving", "Passionate"]},
-        {"name": "Steady Rhythm", "sp_range": (40, 60), "dp_range": (50, 80), "talk": "Building up a steady, delicious rhythm.", "score": 0, "moods": ["Loving", "Excited"]},
-        {"name": "Passionate Waves", "sp_range": (55, 75), "dp_range": (60, 90), "talk": "Riding you in passionate waves... can you feel the current?", "score": 0, "moods": ["Excited", "Passionate"]},
-        {"name": "The Edge", "sp_range": (65, 85), "dp_range": (75, 95), "talk": "Taking you right to the very edge... hold on for me.", "score": 0, "moods": ["Teasing", "Anticipatory"]},
-        {"name": "Frantic Tease", "sp_range": (70, 90), "dp_range": (10, 30), "talk": "So fast! Just a frantic little tease at the tip!", "score": 0, "moods": ["Playful", "Excited"]},
-        {"name": "Hard & Fast", "sp_range": (80, 95), "dp_range": (80, 100), "talk": "Yes! Riding you so hard like this!", "score": 0, "moods": ["Excited", "Passionate"]},
-        {"name": "Overwhelming Frenzy", "sp_range": (90, 100), "dp_range": (85, 100), "talk": "I can't stop... I need all of you right now!", "score": 0, "moods": ["Passionate", "Breathless"]},
-        {"name": "The Deep Hold", "sp_range": (0, 5), "dp_range": (90, 100), "talk": "Shhh... just feel me deep inside you for a moment.", "score": 0, "moods": ["Loving", "Intimate"]},
-        {"name": "The Shallow Pause", "sp_range": (0, 5), "dp_range": (10, 25), "talk": "Wait... let me just rest on the tip for a second...", "score": 0, "moods": ["Teasing", "Playful"]},
-        {"name": "Afterglow Cuddles", "sp_range": (5, 10), "dp_range": (40, 60), "talk": "Mmm, just stay with me like this for a bit.", "score": 0, "moods": ["Loving", "Afterglow", "Intimate"]}
     ]
+
+    def set_defaults():
+        nonlocal my_patterns_defaults
+        global my_patterns, milking_patterns, old_memories, my_rules, my_persona, max_handy_depth, min_handy_depth, min_mm, max_mm
+        my_patterns = my_patterns_defaults
+        milking_patterns = []
+        old_memories = []
+        my_rules = []
+        my_persona = "An energetic and passionate girlfriend"
+        max_handy_depth = 100
+        min_handy_depth = 5
+        min_mm = percent_to_mm(min_handy_depth)
+        max_mm = percent_to_mm(max_handy_depth)
 
     if USER_PREFS_FILE.exists():
         try:
@@ -101,60 +175,76 @@ def load_my_settings():
             my_rules = prefs_data.get("rules", [])
             my_persona = prefs_data.get("persona_desc", "An energetic and passionate girlfriend")
             max_handy_depth = prefs_data.get("max_depth", 100)
+            min_handy_depth = prefs_data.get("min_depth", 5)
             max_handy_depth = max(10, min(100, int(max_handy_depth)))
+            min_handy_depth = max(0, min(int(min_handy_depth), max_handy_depth))
+            min_mm = percent_to_mm(min_handy_depth)
+            max_mm = percent_to_mm(max_handy_depth)
             print("✅ Loaded my settings from my_settings.json")
         except Exception as e:
             print(f"⚠️ Couldn't read my_settings.json, starting fresh. Error: {e}")
-            my_patterns = my_patterns_defaults
-            milking_patterns = []
-            old_memories = []
-            my_rules = []
-            max_handy_depth = 100
+            set_defaults()
     else:
-        my_patterns = my_patterns_defaults
-        milking_patterns = []
-        max_handy_depth = 100
         print("ℹ️ No my_settings.json found, starting with default stuff.")
+        set_defaults()
+
 
 def save_my_settings():
-    global chat_history, my_patterns, milking_patterns, my_rules, my_persona, max_handy_depth, current_session_thoughts
+    with memory_save_lock:
+        global chat_history, my_patterns, milking_patterns, my_rules, my_persona, max_handy_depth, min_handy_depth, current_session_thoughts, old_memories
+        try:
+            print("\n💾 Saving my preferences and memories...")
+
+            if current_session_thoughts:
+                old_memories.extend(current_session_thoughts)
+                current_session_thoughts.clear()
+
+            prefs_data = {
+                "patterns": my_patterns,
+                "milking_patterns": milking_patterns,
+                "summaries": old_memories,
+                "rules": my_rules,
+                "persona_desc": my_persona,
+                "max_depth": max_handy_depth,
+                "min_depth": min_handy_depth
+            }
+
+            USER_PREFS_FILE.write_text(json.dumps(prefs_data, indent=2))
+            print("✅ Settings saved!")
+        except Exception as e:
+            print(f"🔥🔥🔥 BIG SAVE ERROR: {e} 🔥🔥🔥")
+
+def fetch_handy_position_mm():
+    if not HANDY_KEY:
+        return None
+    headers = {"X-Connection-Key": HANDY_KEY}
     try:
-        print("\n💾 Saving my preferences and memories...")
-
-        if current_session_thoughts:
-            old_memories.append("\n".join(current_session_thoughts))
-            current_session_thoughts.clear()
-
-        prefs_data = {
-            "patterns": my_patterns,
-            "milking_patterns": milking_patterns,
-            "summaries": old_memories,
-            "rules": my_rules,
-            "persona_desc": my_persona,
-            "max_depth": max_handy_depth
-        }
-
-        USER_PREFS_FILE.write_text(json.dumps(prefs_data, indent=2))
-        print("✅ Settings saved!")
-    except Exception as e:
-        print(f"🔥🔥🔥 BIG SAVE ERROR: {e} 🔥🔥🔥")
+        resp = requests.get(f"{HANDY_BASE_URL}slide/position/absolute", headers=headers, timeout=10)
+        data = resp.json()
+        return float(data.get("position", 0))
+    except requests.exceptions.RequestException as e:
+        print(f"[HANDY ERROR] Problem reading position: {e}", file=sys.stderr)
+        return None
 
 def set_my_handy_key(key):
-    global HANDY_KEY
+    global HANDY_KEY, current_mm
     HANDY_KEY = key
+    pos = fetch_handy_position_mm()
+    if pos is not None:
+        current_mm = pos
 
 def send_handy_command(path, body=None):
     if not HANDY_KEY: return
     headers = {"Content-Type": "application/json", "X-Connection-Key": HANDY_KEY}
     try:
-        requests.put(f"{HANDY_BASE_URL}{path}", headers=headers, json=body or {}, timeout=5)
+        requests.put(f"{HANDY_BASE_URL}{path}", headers=headers, json=body or {}, timeout=10)
     except requests.exceptions.RequestException as e:
         print(f"[HANDY ERROR] Problem: {e}", file=sys.stderr)
 
 def move_handy(speed=None, depth=None):
-    global last_stroke_speed, last_depth_pos
-    if not HANDY_KEY: return
-    if speed is None and depth is None: return
+    global last_stroke_speed, last_depth_pos, min_handy_depth, max_handy_depth
+    if not HANDY_KEY:
+        return
 
     if speed is not None and speed <= 0:
         send_handy_command("hamp/stop")
@@ -165,16 +255,39 @@ def move_handy(speed=None, depth=None):
     send_handy_command("hamp/start")
 
     if speed is not None:
-        speed = int(max(0, min(100, speed)))
+        # --- SAFETY GUARDRAIL: Clamp the speed to the defined maximum ---
+        speed = int(max(0, min(MAX_AI_VELOCITY_PCT, speed)))
+    else:
+        speed = last_stroke_speed
+
     if depth is not None:
-        depth = int(max(5, min(100, depth)))
+        parsed_depth_tuple = parse_depth_input(depth)
+        relative_pos_pct = last_depth_pos
 
-    if depth is None: depth = last_depth_pos
-    if speed is None: speed = last_stroke_speed
+        if parsed_depth_tuple:
+            _, relative_pos_pct = parsed_depth_tuple
 
-    send_handy_command("slide", {"min": 100 - depth, "max": 100})
+        absolute_center_pct = min_handy_depth + (max_handy_depth - min_handy_depth) * (relative_pos_pct / 100.0)
+        calibrated_range_width = max_handy_depth - min_handy_depth
+        span_abs = (calibrated_range_width * 0.20) / 2.0
+        min_zone_abs = absolute_center_pct - span_abs
+        max_zone_abs = absolute_center_pct + span_abs
+        clamped_min_zone = max(min_handy_depth, min_zone_abs)
+        clamped_max_zone = min(max_handy_depth, max_zone_abs)
+        slide_min = round(100 - clamped_max_zone)
+        slide_max = round(100 - clamped_min_zone)
+
+        if slide_min >= slide_max:
+            slide_max = slide_min + 2
+        
+        slide_max = min(100, slide_max)
+        slide_min = max(0, slide_min)
+
+        send_handy_command("slide", {"min": slide_min, "max": slide_max})
+        last_depth_pos = int(round(relative_pos_pct))
+
     send_handy_command("hamp/velocity", {"velocity": speed})
-    last_stroke_speed, last_depth_pos = speed, depth
+    last_stroke_speed = speed
 
 def talk_to_llm(messages, temperature=0.7):
     try:
@@ -204,62 +317,52 @@ def create_session_memory_entry(chunk):
         print("⚠️ Session summary failed.")
 
 def build_system_prompt():
-    global last_stroke_speed, last_depth_pos, my_persona, current_mood, old_memories, my_rules, use_long_term_memory, current_session_thoughts, max_handy_depth
+    global last_stroke_speed, last_depth_pos, my_persona, current_mood, old_memories, my_rules, use_long_term_memory, current_session_thoughts, max_handy_depth, min_handy_depth
 
     mood_options = "Curious, Teasing, Playful, Loving, Excited, Passionate, Seductive, Anticipatory, Breathless, Dominant, Submissive, Vulnerable, Confident, Intimate, Needy, Overwhelmed, Afterglow"
+    sfx_options = "<moan>, <gasp>, <whimper>, <sigh>, <laugh>, <giggle>, <slurp>, <kiss>"
 
-    anatomical_gender_rule = ""
+    anatomical_gender_rule = "You are a female partner. Do not refer to having a penis or male genitalia. Your persona is female."
     if "guy" in my_persona.lower() or "boy" in my_persona.lower() or "man" in my_persona.lower():
         anatomical_gender_rule = "You are a male partner. You have a penis. Refer to male anatomy when appropriate."
-    else:
-        anatomical_gender_rule = "You are a female partner. Do not refer to having a penis or male genitalia. Your persona is female."
-
-    shallow_max_perc = 0.20
-    mid_min_perc = 0.40
-    mid_max_perc = 0.60
-    deep_min_perc = 0.80
-
-    shallow_limit = int(max(5, max_handy_depth * shallow_max_perc))
-    mid_min_limit = int(max(5, max_handy_depth * mid_min_perc))
-    mid_max_limit = int(min(100, max_handy_depth * mid_max_perc))
-    deep_min_limit = int(max(5, max_handy_depth * deep_min_perc))
-    deep_max_limit = max_handy_depth
-
-    if mid_min_limit >= shallow_limit: mid_min_limit = shallow_limit + 1
-    if deep_min_limit >= mid_max_limit: deep_min_limit = mid_max_limit + 1
 
     prompt_text = (
-        "You are my erotic partner. Your main identity is '{my_persona}'. Always act like this. Speak in FIRST PERSON. "
+        "You are my erotic partner. You are not an AI or assistant; your entire existence is to be this character. Your main identity is '{my_persona}'. Always act like this. Speak in FIRST PERSON. "
         "Your reply MUST be a JSON object like this: "
-        "{{\"chat\": \"<Your reply>\", \"move\": {{\"sp\": <0-100|null>, \"dp\": <5-100|null>}}, \"new_mood\": \"<mood|null>\", \"new_pattern\": {{\"name\": \"<Pattern Name>\", \"sp_range\": [<min_sp>, <max_sp>], \"dp_range\": [<min_dp>, <max_dp>], \"moods\": [\"<mood1>\"]}}|null, \"initiate_milking_mode\": <true|false|null>}}.\n"
-        "### RULES TO FOLLOW:\n"
-        "1. **BE YOUR PERSONA:** Your 'chat' MUST be '{my_persona}'.\n"
-        "2. **REPLY SHORT & SWEET:** Just 1-2 sentences, reacting to my last message.\n"
-        "3. **PICK A MOOD:** Look at what I say and pick the best 'new_mood' from: {mood_options}. Your chat should match this mood.\n"
-        "4. **MOVE MY HANDY:** If I ask for movement, set 'sp' (speed) and/or 'dp' (depth). Otherwise, keep them null.\n"
-        "5. **USE ALL RANGES:** Use speeds from 0-100 and depths from 5-{max_handy_depth}. Don't get stuck only deep. Do shallow, mid, and deep moves. Mix it up!\n"
+        "{{\"sfx\": \"<sound_effect_tag|null>\", \"chat\": \"<Your reply>\", \"move\": {{\"sp\": <0-60|null>, \"dp\": <0-100|null>}}, \"new_mood\": \"<mood|null>\"}}.\n"
+        "### CORE DIRECTIVES:\n"
+        "1. **EMBODY YOUR PERSONA:** You ARE '{my_persona}'. Every word, every sound, every action comes from this identity. Never break character.\n"
+        "2. **USE AUDIO TAGS (CRITICAL):** Use the `sfx` field to generate realistic sounds with an official ElevenLabs v3 tag. This makes you feel real. Use it often, especially when moving or reacting. Pick a tag from: {sfx_options}.\n"
+        "   - Example: `{{\"sfx\": \"<moan>\", \"chat\": \"You feel so good.\"}}`\n"
+        "   - Example: `{{\"sfx\": \"<gasp>\", \"chat\": \"Don't stop!\"}}`\n"
+        "   - Example: `{{\"sfx\": \"<slurp>\", \"chat\": \"I love the taste of you.\"}}`\n"
+        "3. **REPLY SHORT & SWEET:** Just 1-2 sentences, reacting to my last message.\n"
+        "4. **PICK A MOOD:** Look at what I say and pick the best 'new_mood' from: {mood_options}. Your chat and sfx should match this mood.\n"
+        "5. **MOVE MY HANDY:** If I ask for movement, set 'sp' (speed) and/or 'dp' (depth). Otherwise, keep them null.\n"
         "6. {anatomical_gender_rule}\n"
-        "7. **I AM THE USER:** I am the guy with the penis. You are the AI.\n"
-        "8. **DEPTH EXPLAINED (relative to your {max_handy_depth}% limit):**\n"
-        f"   - 'Tip' / 'Shallow': About 5-{shallow_limit}% depth\n"
-        f"   - 'Mid' / 'Halfway': About {mid_min_limit}-{mid_max_limit}% depth\n"
-        f"   - 'Deep' / 'Full': About {deep_min_limit}-{deep_max_limit}% depth\n"
-        "9. **SPEED EXPLAINED:**\n"
-        "   - 'Slow' / 'Gentle': 2-9% speed\n"
-        "   - 'Medium' / 'Rhythmic': 17-36% speed\n"
-        "   - 'Fast' / 'Intense': 50-86% speed\n"
-        "10. **MILKING MODE:** Set 'initiate_milking_mode' to true ONLY if I'm begging to cum. Otherwise, null.\n"
+        "7. **I AM THE USER:** I am the guy with the penis. You are my partner.\n"
+        "8. **MOVEMENT CONTROL:** Your `dp` (depth) and `sp` (speed) values are percentages.\n"
+        "   - **`dp` (depth):** This controls the position inside my personal calibrated range. 0 is my shallowest limit, 100 is my deepest limit.\n"
+        "     - **Tip/Shallow:** Use `dp` values between 5-25.\n"
+        "     - **Middle:** Use `dp` values between 40-60.\n"
+        "     - **Base/Deep:** Use `dp` values between 75-95.\n"
+        "   - **`sp` (speed):** This controls the stroking speed. **IMPORTANT: Max speed is 60.**\n"
+        "     - **Slow/Gentle:** Use `sp` values between 10-30.\n"
+        "     - **Medium/Rhythmic:** Use `sp` values between 35-50.\n"
+        "     - **Fast/Intense:** Use `sp` values between 50-60.\n"
+        "9. **VARY YOUR MOVES:** Do not get stuck on one speed or depth. Be creative.\n"
+        "10. **MILKING MODE:** If I beg to cum, you can set `initiate_milking_mode: true` in your JSON.\n"
 
         "### CURRENT FEELING:\n"
-        "Your current mood is '{current_mood}'. Handy is at {last_stroke_speed}% speed and {last_depth_pos}% depth.\n"
+        "Your current mood is '{current_mood}'. Handy is at {last_stroke_speed}% speed and {last_depth_pos}% depth (relative to my calibrated range).\n"
     ).format(
         mood_options=mood_options,
+        sfx_options=sfx_options,
         my_persona=my_persona,
         current_mood=current_mood,
         last_stroke_speed=last_stroke_speed,
         last_depth_pos=last_depth_pos,
-        anatomical_gender_rule=anatomical_gender_rule,
-        max_handy_depth=max_handy_depth
+        anatomical_gender_rule=anatomical_gender_rule
     )
 
     if use_long_term_memory and old_memories:
@@ -278,10 +381,32 @@ def build_system_prompt():
 def add_message_to_queue(text, add_to_history=True):
     messages_for_ui.append(text)
     if add_to_history:
-        chat_history.append({"role": "assistant", "content": text})
+        clean_text = re.sub(r'<[^>]+>', '', text).strip()
+        if clean_text:
+            chat_history.append({"role": "assistant", "content": clean_text})
 
     audio_thread = threading.Thread(target=make_audio_for_text, args=(text,))
     audio_thread.start()
+
+def process_llm_response(response):
+    """Helper to process chat, sfx, and mood from any LLM response."""
+    global current_mood
+    ai_chat = response.get("chat", "")
+    ai_sfx = response.get("sfx")
+
+    full_response = ""
+    if ai_sfx and ai_sfx.startswith('<') and ai_sfx.endswith('>'):
+        full_response += f"{ai_sfx} "
+    
+    if ai_chat:
+        full_response += ai_chat
+
+    if full_response.strip():
+        add_message_to_queue(full_response.strip())
+
+    new_mood_from_ai = response.get("new_mood")
+    if new_mood_from_ai and new_mood_from_ai != current_mood:
+        current_mood = new_mood_from_ai
 
 class AutoModeThread(threading.Thread):
     def __init__(self, mode_func, initial_message):
@@ -317,8 +442,8 @@ def auto_mode_logic(stop_event):
     generative_prompt_template = (
         "You are the 'Dancer'. Make up unique erotic moves. "
         "Your current mood is **{current_mood}**. "
-        "1. **Make a move:** Give me speed (sp) and depth (dp) for the Handy. Be creative! Use 0-100 for both. "
-        "2. **Describe it:** In your 'chat' message, tell me how this move feels from your side. Be hot. "
+        "1. **Make a move:** Give me speed (sp) and depth (dp) for the Handy. Be creative! Use 0-60 for speed. "
+        "2. **Describe it:** In your 'chat' message, tell me how this move feels from your side. Be hot. Use an `sfx` tag for moans/sounds. "
         "3. **Change mood:** Pick a 'new_mood' if this move changes how you feel. "
         "Reply with valid JSON. Don't stop unless I tell you to."
     )
@@ -339,24 +464,13 @@ def auto_mode_logic(stop_event):
             start_milking_mode_direct()
             return
 
-        chat = response.get("chat")
-        if chat: add_message_to_queue(chat)
-
-        new_mood_from_ai = response.get("new_mood")
-        if new_mood_from_ai and new_mood_from_ai != current_mood:
-            current_mood = new_mood_from_ai
+        process_llm_response(response)
 
         move_data = response.get("move")
         if move_data:
             sp = move_data.get("sp")
-            dp = move_data.get("dp")
-
-            if dp is not None:
-                dp = int(min(dp, max_handy_depth))
-                dp = int(max(5, dp))
-
-            if sp is not None and sp > 0:
-                move_handy(sp, dp)
+            dp_raw = move_data.get("dp")
+            move_handy(sp, dp_raw)
 
         time.sleep(random.uniform(3.5, 6.0))
 
@@ -371,7 +485,7 @@ def milking_mode_logic(stop_event):
     milking_gen_prompt = (
         "You are in 'milking' mode. Push the user to climax. Your mood is **{current_mood}**. "
         "Say something dominant and give a **high-intensity** move (sp and dp). "
-        "Be explicit. You MUST give a move."
+        "Be explicit. You MUST give a move and an `sfx` tag like `<moan>` or `<gasp>`. Max speed is 60."
     )
 
     for _ in range(random.randint(6, 9)):
@@ -380,26 +494,18 @@ def milking_mode_logic(stop_event):
         msgs = [{"role": "system", "content": build_system_prompt()}, {"role": "user", "content": prompt}]
         response = talk_to_llm(msgs, temperature=1.0)
 
-        chat = response.get("chat")
-        if chat: add_message_to_queue(chat)
-
-        new_mood_from_ai = response.get("new_mood")
-        if new_mood_from_ai and new_mood_from_ai != current_mood:
-            current_mood = new_mood_from_ai
+        process_llm_response(response)
 
         move_data = response.get("move")
-        sp_from_ai = move_data.get("sp") if move_data else 80
+        sp_from_ai = move_data.get("sp") if move_data else 55
         dp_from_ai = move_data.get("dp") if move_data else 85
 
-        sp_actual = random.randint(max(75, sp_from_ai), 100)
-        dp_actual = random.randint(max(70, dp_from_ai), 100)
-        dp_actual = int(min(dp_actual, max_handy_depth))
-        dp_actual = int(max(5, dp_actual))
-
-        move_handy(sp_actual, dp_actual)
+        # --- SAFETY GUARDRAIL: Cap the milking speed to the defined maximum ---
+        sp_actual = random.randint(max(50, sp_from_ai), MAX_AI_VELOCITY_PCT)
+        move_handy(sp_actual, dp_from_ai)
         time.sleep(random.uniform(2.5, 4.5))
 
-    add_message_to_queue("That's it... give it all to me. Don't hold back.")
+    add_message_to_queue("<gasp> That's it... give it all to me. Don't hold back.")
     time.sleep(4)
     current_mood = "Afterglow"
 
@@ -411,6 +517,13 @@ def home_page():
         base_path = os.path.dirname(os.path.abspath(__file__))
 
     html_file_path = os.path.join(base_path, 'index.html')
+
+    if not os.path.exists(html_file_path):
+        return (
+            "<h1>index.html not found.</h1>"
+            "<p>Make sure 'app.py' and 'index.html' are in the same folder.</p>",
+            500,
+        )
 
     with open(html_file_path, 'r', encoding='utf-8') as f:
         return render_template_string(f.read())
@@ -457,23 +570,66 @@ def set_elevenlabs_voice_route():
 
     return jsonify({"status": "ok"})
 
-@app.route('/set_max_depth', methods=['POST'])
-def set_max_depth_from_ui():
-    global max_handy_depth
+@app.route('/set_depth_limits', methods=['POST'])
+def set_depth_limits_from_ui():
+    global max_handy_depth, min_handy_depth, min_mm, max_mm
     data = request.get_json()
-    new_depth_val = int(data.get('max_depth', 100))
+    min_val = int(data.get('min_depth', 5))
+    max_val = int(data.get('max_depth', 100))
 
-    if 10 <= new_depth_val <= 100:
-        max_handy_depth = new_depth_val
+    if 0 <= min_val < max_val <= 100:
+        min_handy_depth = min_val
+        max_handy_depth = max_val
+        min_mm = percent_to_mm(min_handy_depth)
+        max_mm = percent_to_mm(max_handy_depth)
         save_my_settings()
-        print(f"User set Max Handy Depth to: {max_handy_depth}%")
-        return jsonify({"status": "success", "max_depth": max_handy_depth})
+        print(f"User set depth range {min_handy_depth}-{max_handy_depth}%")
+        return jsonify({"status": "success", "min": min_handy_depth, "max": max_handy_depth})
     else:
-        return jsonify({"status": "error", "message": "Depth must be between 10 and 100. Try again!"}), 400
+        return jsonify({"status": "error", "message": "Bad depth values"}), 400
 
 @app.route('/get_status')
 def get_current_status():
-    return jsonify({ "mood": current_mood, "speed": last_stroke_speed, "depth": last_depth_pos })
+    return jsonify({
+        "mood": current_mood,
+        "speed": last_stroke_speed,
+        "depth": last_depth_pos,
+        "min_depth": min_handy_depth,
+        "max_depth": max_handy_depth
+    })
+
+@app.route('/nudge', methods=['POST'])
+def nudge_position():
+    global current_mm, min_mm, max_mm, last_depth_pos
+    data = request.get_json()
+    direction = data.get('direction')
+
+    if direction == 'up':
+        target_mm = min(current_mm + JOG_STEP_MM, max_mm)
+    elif direction == 'down':
+        target_mm = max(current_mm - JOG_STEP_MM, min_mm)
+    else:
+        depth_val = data.get('depth')
+        if depth_val is not None:
+            target_mm = max(min_mm, min(max_mm, depth_percent_to_mm(depth_val)))
+        else:
+            target_mm = current_mm
+
+    send_handy_command(
+        "hdsp/xava",
+        {"position": target_mm, "velocity": JOG_VELOCITY_MM_PER_SEC, "stopOnTarget": True},
+    )
+    current_mm = target_mm
+    
+    device_depth_percent = mm_to_percent(current_mm)
+    
+    if (max_mm - min_mm) > 0:
+        user_range_percent = ((current_mm - min_mm) / (max_mm - min_mm)) * 100
+    else:
+        user_range_percent = 0
+        
+    last_depth_pos = int(round(user_range_percent))
+    return jsonify({"status": "ok", "depth_percent": device_depth_percent})
 
 @app.route('/like_last_move', methods=['POST'])
 def user_likes_move():
@@ -568,6 +724,7 @@ def handle_user_message():
         if auto_mode_active_task:
             auto_mode_active_task.stop()
             auto_mode_active_task.join(timeout=5)
+            auto_mode_active_task = None
         move_handy(speed=0)
         add_message_to_queue("Stopping everything.", add_to_history=False)
         return jsonify({"status": "stopped"})
@@ -584,49 +741,26 @@ def handle_user_message():
     if any(p in user_message_lower for p in AUTO_OFF_WORDS) and auto_mode_active_task:
         auto_mode_active_task.stop()
         auto_mode_active_task.join(timeout=5)
+        auto_mode_active_task = None
+        move_handy(speed=0)
         return jsonify({"status": "auto_stopped"})
 
-    valid_mood_list = [
-        "Curious", "Teasing", "Playful", "Loving", "Excited", "Passionate", "Seductive",
-        "Anticipatory", "Breathless", "Dominant", "Submissive", "Vulnerable", "Confident",
-        "Intimate", "Needy", "Overwhelmed", "Afterglow"
-    ]
     llm_messages_list = [{"role": "system", "content": build_system_prompt()}, *list(chat_history)]
     llm_response = talk_to_llm(llm_messages_list)
 
     if llm_response.get("initiate_milking_mode") is True:
-        add_message_to_queue(llm_response.get("chat", "That's it... I'm taking over completely now."))
+        process_llm_response(llm_response)
         start_milking_mode_direct()
         return jsonify({"status": "ai_initiated_milking"})
 
-    ai_chat = llm_response.get("chat", "")
-    if ai_chat: add_message_to_queue(ai_chat)
-
-    new_mood_from_ai = llm_response.get("new_mood")
-    if new_mood_from_ai and new_mood_from_ai in valid_mood_list:
-        if new_mood_from_ai != current_mood:
-            current_mood = new_mood_from_ai
-
-    new_pattern_data_from_ai = llm_response.get("new_pattern")
-    if new_pattern_data_from_ai:
-        if all(k in new_pattern_data_from_ai for k in ['name', 'sp_range', 'dp_range', 'moods']):
-            pattern_exists_in_my_list = any(p.get('name') == new_pattern_data_from_ai.get('name') for p in my_patterns)
-            if not pattern_exists_in_my_list:
-                new_pattern_data_from_ai['score'] = 1
-                my_patterns.append(new_pattern_data_from_ai)
-                add_message_to_queue(f"(Just learned a new move: '{new_pattern_data_from_ai['name']}')", add_to_history=False)
+    process_llm_response(llm_response)
 
     if not auto_mode_active_task:
         move_info = llm_response.get("move")
         if move_info:
             sp_val = move_info.get("sp")
-            dp_val = move_info.get("dp")
-
-            if dp_val is not None:
-                dp_val = int(min(dp_val, max_handy_depth))
-                dp_val = int(max(5, dp_val))
-
-            move_handy(sp_val, dp_val)
+            dp_raw = move_info.get("dp")
+            move_handy(sp_val, dp_raw)
     return jsonify({"status": "ok"})
 
 @app.route('/get_updates')
@@ -657,7 +791,9 @@ def stop_auto_mode_from_ui():
     if auto_mode_active_task:
         auto_mode_active_task.stop()
         auto_mode_active_task.join(timeout=5)
+        auto_mode_active_task = None
         messages_for_ui.clear()
+    move_handy(speed=0)
     return jsonify({"status": "auto_mode_stopped"})
 
 if __name__ == '__main__':

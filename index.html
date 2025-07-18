@@ -16,6 +16,47 @@
             flex-direction: row;
         }
 
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 1s ease-out;
+            opacity: 1;
+        }
+
+        #splash-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #splash-screen img {
+            max-width: 90%;
+            max-height: 70%;
+            object-fit: contain;
+        }
+
+        #splash-screen p {
+            margin-top: 20px;
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 0 0 10px #ff79c6, 0 0 20px #ff79c6;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+
         #main-area {
             flex-grow: 1;
             display: flex;
@@ -156,45 +197,31 @@
         .sidebar-button.milking:hover { background-color: #ff92d0; }
         .sidebar-button.stop:hover { background-color: #ff6e6e; }
 
-        .slider-control {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-        }
-        .slider-control label, .audio-toggle-line label { white-space: nowrap; font-size: 0.95em; }
-        .slider-control input[type="range"] {
-            flex-grow: 1;
-            -webkit-appearance: none;
-            height: 8px;
-            background: #44475a;
-            border-radius: 4px;
-            outline: none;
-            opacity: 0.9;
-        }
-        .slider-control input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #bd93f9;
-            cursor: pointer;
-            border: 2px solid #f8f8f2;
-            box-shadow: 0 0 3px rgba(0,0,0,0.3);
-        }
-        .slider-control #currentDepthDisplay {
-            min-width: 40px;
-            text-align: right;
-            font-weight: bold;
-            color: #ffb86c;
-        }
         .audio-toggle-line { display: flex; align-items: center; gap: 8px; }
 
         #status-text { margin-top: 10px; font-size: 0.9em; text-align: center; color: #bd93f9; }
+        #setup-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none; /* Initially hidden */
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: #f8f8f2;
+        }
+        #setup-box { text-align: center; background-color: #282a36; padding: 20px; border-radius: 8px; border: 1px solid #6272a4;}
+        #setup-box h2 { color: #8be9fd; }
+        #setup-box button { margin-top: 10px; }
     </style>
 </head>
 <body>
+    <div id="splash-screen">
+        <img src="/static/splash.jpg.jpg" alt="StrokeGPT">
+        <p>Press Enter to Begin</p>
+    </div>
+
     <div id="main-area">
         <div id="top-bar">
             <h1>My Handy AI Chat</h1>
@@ -219,18 +246,6 @@
 
     <div id="sidebar">
         <div class="setting-section">
-            <h3>Handy Setup</h3>
-            <input type="password" id="handy-key-input" class="input-text" placeholder="Enter Handy Key">
-            <button id="save-handy-key-btn" class="my-button">Set Key</button>
-        </div>
-
-        <div class="setting-section">
-            <h3>My Persona</h3>
-            <input type="text" id="persona-description-input" class="input-text" placeholder="Describe my partner...">
-            <button id="set-persona-button" class="my-button">Set Persona</button>
-        </div>
-
-        <div class="setting-section">
             <h3>Voice Output (ElevenLabs)</h3>
             <input type="password" id="elevenlabs-key-input" class="input-text" placeholder="ElevenLabs API Key">
             <button id="set-elevenlabs-key-button" class="my-button">Set Key</button>
@@ -253,20 +268,16 @@
             </div>
         </div>
 
-        <div class="setting-section">
-            <h3>Depth Limit</h3>
-            <div class="slider-control">
-                <label for="max-depth-slider-input">Max Depth:</label>
-                <input type="range" id="max-depth-slider-input" min="10" max="100" value="100">
-                <span id="currentDepthDisplay">100%</span>
-            </div>
-        </div>
 
         <div class="setting-section" style="margin-top: auto;">
             <h3>DANGER ZONE</h3>
             <button id="milking-mode-btn" class="my-button sidebar-button milking" style="margin-bottom: 10px;">Milk Me</button>
             <button id="emergency-stop-all-btn" class="my-button sidebar-button stop">STOP EVERYTHING</button>
         </div>
+    </div>
+
+    <div id="setup-overlay">
+        <div id="setup-box"></div>
     </div>
 
     <script>
@@ -277,23 +288,18 @@
         const startAutoBtn = document.getElementById('start-auto-btn');
         const stopAutoBtn = document.getElementById('stop-auto-btn');
         const likeThisMoveBtn = document.getElementById('like-this-move-btn');
-        const handyKeyInput = document.getElementById('handy-key-input');
-        const saveHandyKeyBtn = document.getElementById('save-handy-key-btn');
         const statusText = document.getElementById('status-text');
         const moodDisplay = document.getElementById('mood-display');
         const rhythmCanvas = document.getElementById('rhythm-canvas');
         const ctx = rhythmCanvas.getContext('2d');
-        const personaDescriptionInput = document.getElementById('persona-description-input');
-        const setPersonaButton = document.getElementById('set-persona-button');
         const emergencyStopAllBtn = document.getElementById('emergency-stop-all-btn');
         const milkingModeBtn = document.getElementById('milking-mode-btn');
         const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
-        const maxDepthSliderInput = document.getElementById('max-depth-slider-input');
-        const currentDepthDisplay = document.getElementById('currentDepthDisplay');
         const elevenLabsKeyInput = document.getElementById('elevenlabs-key-input');
         const setElevenLabsKeyButton = document.getElementById('set-elevenlabs-key-button');
         const elevenlabsVoiceSelectBox = document.getElementById('elevenlabs-voice-select-box');
         const enableAudioCheckbox = document.getElementById('enable-audio-checkbox');
+        const splashScreen = document.getElementById('splash-screen');
 
         let myHandyKey = '';
         let myPersonaDescription = 'An energetic and passionate girlfriend';
@@ -302,6 +308,13 @@
         let isAudioPlaying = false;
         let audioPlaybackQueue = [];
         let isPollingUpdates = false;
+
+        let setupStep = 1;
+        let tempDepth = 50;
+        let setupMin = 0;
+        let setupMax = 100;
+        const setupOverlay = document.getElementById('setup-overlay');
+        const setupBox = document.getElementById('setup-box');
 
         function resizeCanvas() {
             if (!rhythmCanvas.parentElement) return;
@@ -349,7 +362,7 @@
         }
 
         async function sendUserMessage(message) {
-            if (!myHandyKey) { addChatMessage('BOT', 'Please set your Handy Key first!'); return; }
+            if (!myHandyKey) { addChatMessage('BOT', 'Please complete the setup first!'); return; }
             if (message.trim() !== '') {
                 addChatMessage('YOU', message);
                 userChatInput.value = '';
@@ -424,10 +437,73 @@
                 drawHandyVisualizer(data.speed || 0, data.depth || 0);
                 if (data.max_depth !== undefined && data.max_depth !== null) {
                     currentMaxHandyDepth = data.max_depth;
-                    maxDepthSliderInput.value = data.max_depth;
-                    currentDepthDisplay.textContent = `${data.max_depth}%`;
                 }
             } catch (error) {}
+        }
+
+        async function sendNudge(dir) {
+            try {
+                const resp = await fetch('/nudge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ direction: dir, key: myHandyKey })
+                });
+                const data = await resp.json();
+                if (data.depth_percent !== undefined) {
+                    tempDepth = data.depth_percent;
+                    const dVal = document.getElementById('d-val');
+                    if (dVal) dVal.textContent = tempDepth;
+                }
+            } catch (e) {}
+        }
+
+        function renderSetup() {
+            setupOverlay.style.display = 'flex'; // Show the guide overlay
+            if (setupStep === 1) {
+                setupBox.innerHTML = `<h2>Step 1: Handy Key</h2>` +
+                    `<p>Please enter your connection key from handyfeeling.com</p>` +
+                    `<input type="password" id="setup-key" class="input-text" placeholder="Handy Key"><br>` +
+                    `<button id="setup-next" class="my-button">Next</button>`;
+                document.getElementById('setup-next').onclick = () => {
+                    const k = document.getElementById('setup-key').value.trim();
+                    if (!k) return;
+                    myHandyKey = k;
+                    fetch('/send_message', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:'', key:k})});
+                    setupStep = 2; renderSetup();
+                };
+            } else if (setupStep === 2) {
+                setupBox.innerHTML = `<h2>Step 2: Persona</h2>` +
+                    `<p>Describe the personality of your AI partner.</p>` +
+                    `<input type="text" id="setup-persona" class="input-text" value="An energetic and passionate girlfriend" placeholder="Describe persona"><br>` +
+                    `<button id="setup-next" class="my-button">Next</button>`;
+                document.getElementById('setup-next').onclick = () => {
+                    const p = document.getElementById('setup-persona').value.trim() || 'An energetic and passionate girlfriend';
+                    myPersonaDescription = p;
+                    fetch('/send_message', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:'', key: myHandyKey, persona_desc: p})});
+                    setupStep = 3; renderSetup();
+                };
+            } else if (setupStep === 3) {
+                setupBox.innerHTML = `<h2>Step 3: Set MIN Depth</h2>` +
+                    `<p>Move the slider to your shallowest comfortable position and click Set.</p>` +
+                    `<div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button> <span id="d-val" style="padding: 0 15px;">${tempDepth}</span>% <button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div>` +
+                    `<button id="set-min" class="my-button">Set Min</button>`;
+                document.getElementById('d-up').onclick = () => { sendNudge('up'); };
+                document.getElementById('d-down').onclick = () => { sendNudge('down'); };
+                document.getElementById('set-min').onclick = () => { setupMin = tempDepth; setupStep = 4; renderSetup(); };
+            } else if (setupStep === 4) {
+                setupBox.innerHTML = `<h2>Step 4: Set MAX Depth</h2>` +
+                    `<p>Move the slider to your deepest comfortable position and click Finish.</p>` +
+                    `<div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button> <span id="d-val" style="padding: 0 15px;">${tempDepth}</span>% <button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div>` +
+                    `<button id="finish" class="my-button">Finish Setup</button>`;
+                document.getElementById('d-up').onclick = () => { sendNudge('up'); };
+                document.getElementById('d-down').onclick = () => { sendNudge('down'); };
+                document.getElementById('finish').onclick = () => {
+                    setupMax = tempDepth;
+                    fetch('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({min_depth: setupMin, max_depth: setupMax})});
+                    setupOverlay.style.display = 'none';
+                    statusText.textContent = `Status: Setup complete! Range: ${setupMin}% - ${setupMax}%. Ready to chat.`;
+                };
+            }
         }
 
         sendChatBtn.addEventListener('click', () => sendUserMessage(userChatInput.value));
@@ -437,36 +513,13 @@
             try { await fetch('/stop_auto_mode', { method: 'POST' }); } catch (error) { addChatMessage('BOT', 'Error stopping auto mode.'); }
         });
 
-        setPersonaButton.addEventListener('click', () => {
-            const newPersona = personaDescriptionInput.value.trim();
-            if (newPersona) {
-                myPersonaDescription = newPersona;
-                sendUserMessage('');
-                addChatMessage('BOT', `New Persona Set: ${newPersona}`);
-            }
-        });
-
-        saveHandyKeyBtn.addEventListener('click', () => {
-            const key = handyKeyInput.value.trim();
-            if (key) {
-                myHandyKey = key;
-                statusText.textContent = 'Status: Handy Key set. Ready to go!';
-                addChatMessage('BOT', 'Handy Key has been set.');
-                fetch('/send_message', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: '', key: myHandyKey, persona_desc: myPersonaDescription })
-                });
-            }
-        });
-
         likeThisMoveBtn.addEventListener('click', async () => {
             try {
                 const response = await fetch('/like_last_move', { method: 'POST' });
                 const data = await response.json();
                 if (data.status === 'learned') {
                     statusText.textContent = `Cool! Learned a new move: ${data.name}`;
-                    likeThisMoveBtn.classList.add('liked'); // Add a class for visual feedback
+                    likeThisMoveBtn.classList.add('liked');
                     setTimeout(() => { likeThisMoveBtn.classList.remove('liked'); }, 500);
                 } else if (data.status === 'failed_to_learn') {
                     statusText.textContent = "Status: AI couldn't learn that one.";
@@ -481,7 +534,7 @@
 
         document.addEventListener('keydown', (e) => {
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
-            if (e.code === 'Backquote') { // ` key
+            if (e.code === 'Backquote') {
                 e.preventDefault();
                 likeThisMoveBtn.click();
             }
@@ -493,7 +546,7 @@
         });
 
         milkingModeBtn.addEventListener('click', async () => {
-            if (!myHandyKey) { addChatMessage('BOT', 'Please set your Handy Key first!'); return; }
+            if (!myHandyKey) { addChatMessage('BOT', 'Please complete the setup first!'); return; }
             try {
                 await fetch('/start_milking_mode', { method: 'POST' });
                 statusText.textContent = "Status: Milking mode is ON!";
@@ -521,27 +574,6 @@
             }
         });
 
-        maxDepthSliderInput.addEventListener('input', async (e) => {
-            const newMaxDepth = parseInt(e.target.value);
-            currentDepthDisplay.textContent = `${newMaxDepth}%`;
-            currentMaxHandyDepth = newMaxDepth;
-            try {
-                const response = await fetch('/set_max_depth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ max_depth: newMaxDepth })
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    statusText.textContent = `Status: Max Depth set to ${data.max_depth}%.`;
-                } else {
-                    statusText.textContent = `Status: Error setting Max Depth: ${data.message}`;
-                }
-            } catch (error) {
-                console.error('Error setting max depth:', error);
-                statusText.textContent = "Status: Error updating max depth.";
-            }
-        });
 
         setElevenLabsKeyButton.addEventListener('click', async () => {
             const apiKey = elevenLabsKeyInput.value.trim();
@@ -598,13 +630,29 @@
         elevenlabsVoiceSelectBox.addEventListener('change', updateAudioSettings);
         enableAudioCheckbox.addEventListener('change', updateAudioSettings);
 
+        function handleStart() {
+            splashScreen.classList.add('hidden');
+            // Wait for the fade out to finish before starting the setup
+            setTimeout(() => {
+                renderSetup();
+            }, 1000); // Matches the CSS transition duration
+        }
+
         window.addEventListener('resize', resizeCanvas);
         document.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
             drawHandyVisualizer(0, 100);
             setInterval(getNewUpdates, 1500);
             setInterval(getMyStatus, 500);
-            addChatMessage('BOT', "Welcome! Set your Handy key in the sidebar to begin!");
+
+            // Listen for Enter key to start the app
+            const startHandler = (e) => {
+                if (e.key === 'Enter') {
+                    document.removeEventListener('keydown', startHandler);
+                    handleStart();
+                }
+            };
+            document.addEventListener('keydown', startHandler);
         });
     </script>
 </body>
