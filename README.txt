@@ -1,87 +1,90 @@
-Welcome to StrokeGPT v1.1 - Manual Setup!
+# StrokeGPT Handy Controller
 
-This version lets you run StrokeGPT yourself from the code, so you're in charge.
---------------------
-QUICK START GUIDE (Manual Setup)
---------------------
+Welcome to StrokeGPT! This is a guide to help you set up your own private, voice-enabled AI companion for The Handy.
 
-**Part 1: Get Ready (One-Time Setup - harder than it looks, I promise)**
+## What Does It Do?
 
-1.  **INSTALL PYTHON:**
-    * Go to: https://www.python.org/downloads/
-    * Get and install the **NEWEST Python 3**.
-    * **SUPER IMPORTANT:** When installing, make sure you **TICK THE BOX** that says "Add Python to PATH" (or something similar).
-    This is a must-do for the next steps.
+- **An AI That Controls Your Handy**: Chat with an AI, and it will control The Handy's movements in real-time based on the conversation.
+- **Realistic Voice**: The AI's responses are spoken aloud in a natural voice, complete with realistic sounds like moans, gasps, and sighs.
+- **Made For You**: A simple setup guide helps you calibrate The Handy to your own body, so all movements are perfectly comfortable.
+- **It Remembers You**: The AI can learn your preferences and remember details from past chats, creating a more personal experience.
+- **Completely Private**: Everything runs on your own computer. Your conversations and settings are never sent to anyone.
+- **Built-in Safety**: A "speed governor" is always active to ensure the movements stay within a safe and comfortable range.
 
-2.  **INSTALL OLLAMA (The AI Helper):**
-    * Go to: https://ollama.com
-    * Download and install Ollama.
-    This program runs the AI right on your computer.
+---
 
-3.  **UNZIP THIS PROJECT:**
-    * Take all the files from this .zip and put them into a new, empty folder on your computer (like C:\StrokeGPT).
-    Don't forget where you put it!
+## How to Get Started (Step-by-Step Guide)
 
-**Part 2: Run StrokeGPT!**
+Follow these steps carefully, and you'll be up and running in no time.
 
-1.  **OPEN YOUR TERMINAL (Command Prompt/PowerShell):**
-    * **On Windows:** Find that folder where you unzipped "StrokeGPT".
-    * Click on the **address bar** at the top of the folder window (it shows the folder path, like `C:\Users\YourName\StrokeGPT`).
-    * Type `cmd` (for Command Prompt) or `powershell` (for PowerShell) there and hit `Enter`.
-    * A black (or blue) window will pop up. That's your terminal.
-2.  **INSTALL PYTHON PARTS (Only once):**
-    * In that terminal window, type this command **EXACTLY** and press `Enter`:
+### Step 1: Get the Necessary Software
 
-        pip install -r requirements.txt
+Before we begin, you need three main things on your computer.
 
-    * *What happens:* You'll see text fly by as Python grabs and puts in all the stuff it needs.
-    This could take a couple of minutes.
-    * *If you get errors:* Check your internet connection.
-    If it complains "Python not found", you messed up step 1, reinstall Python and make sure "Add Python to PATH" was checked.
-3.  **DOWNLOAD THE AI MODEL (Only once):**
-    * **First, make sure the Ollama app is RUNNING.** Look for its little icon near the clock on your screen (system tray).
-    If it's not there, open Ollama from your Start Menu.
-    * Once Ollama is going, in the **same terminal window**, type this command **EXACTLY** and press `Enter`:
+1.  **Python**: This is the programming language the app is built on.
+    - Go to the [official Python website](https://www.python.org/downloads/) and download the latest version for your operating system (Windows or Mac).
+    - When installing, **make sure to check the box that says "Add Python to PATH"**. This is very important!
 
-       ollama pull llama3:8b-instruct-q4_K_M
+2.  **Ollama (for the AI's Brain)**: This is a free program that runs the AI model on your computer.
+    - Go to the [Ollama website](https://ollama.com/) and download it.
+    - After installing, open your computer's terminal (Command Prompt on Windows, or Terminal on Mac) and run the following command to download the specific AI model we'll be using:
+      
+      ollama run llama3:8b-instruct-q4_K_M
+      
+    - This will take some time as it downloads the model (several gigabytes). Once it's done, you can close the terminal. Ollama will keep running in the background.
 
-    * *What happens:* Ollama will download the AI brain.
-    This might take a while, depending on your internet. You'll see a progress bar.
-4.  **START STROKEGPT SERVER:**
-    * In the **same terminal window**, type this command **EXACTLY** and press `Enter`:
+3.  **The Project Files (StrokeGPT)**:
+    - Go to the GitHub page for this project.
+    - Click the green `<> Code` button.
+    - In the dropdown menu, click **"Download ZIP"**.
+    - Unzip the downloaded file into a folder where you can easily find it, for example, on your Desktop.
 
-        python app.py
+### Step 2: Set Up the Project Folder
 
-    * *What happens:* The server will start up, and you'll see messages like "Server starting..." and an address like `http://127.0.0.1:5000`.
-    This window **HAS to stay open** while you're using StrokeGPT.
+Now we'll get the StrokeGPT folder ready.
 
-5.  **OPEN YOUR BROWSER:**
-    * Open your web browser (like Chrome, Firefox, or Edge) and go to this address:
-        ```
-        [http://127.0.0.1:5000](http://127.0.0.1:5000)
-        ```
+1.  **Create the `requirements.txt` File**: (OR IF IT ALREADY EXISTS, SKIP THIS STEP!)
+    - Inside your unzipped project folder, create a new text file.
+    - Name it `requirements.txt`.
+    - Open the file and paste the following three lines into it. Make sure there are no extra spaces.
+      ```
+      flask
+      requests
+      elevenlabs
+      ```
+    - Save and close the file.
 
---------------------
-HOW TO STOP THE APP
---------------------
+2.  **Add the Splash Screen Image**:
+    - Inside the project folder, create a new folder and name it `static`.
+    - **Add the `splash.jpg into there.`**.
 
-* When you're done playing, go back to that terminal window where `app.py` is running.
-* Press `Ctrl` + `C` on your keyboard (hold Ctrl, then press C).
-* It might ask "Terminate batch job (Y/N)?". Type `Y` and hit `Enter`.
-* The server will shut down and automatically save your chat memories and any new moves it learned.
-Then you can close the terminal window.
+### Step 3: Install the Helper Programs
 
---------------------
-QUICK TROUBLESHOOTING
---------------------
+This step uses the `requirements.txt` file you just created to install the programs StrokeGPT needs to function.
 
-* **"Python command not found"**: Reinstall Python and make sure you checked "Add Python to PATH".
-* **"Ollama command not found"**: Did you install Ollama?
-* **"The AI is responding slowly."**
-    * This is all about your computer's graphics card (GPU).
-    A beefier card is the only way to make it faster.
-* **"The AI seems 'dumb' or doesn't follow instructions well."**
-    * Make sure Ollama is running and has completely downloaded the `mistral-openorca` model.
-* **"The app crashed or is frozen."**
-    * Just go back to the black server window, close it (or hit `Ctrl+C`), then try steps 4 and 5 again.
-For more details and advanced fixes, check out the `MANUAL.txt` file.
+1.  **Open a Terminal in Your Project Folder**:
+    - **On Windows**: Go into your project folder in File Explorer. Click on the address bar at the top, type `cmd`, and press Enter. A command prompt will open directly in that folder.
+    - **On Mac**: Open the Terminal app. Type `cd ` (with a space after it), then drag your project folder from Finder and drop it onto the Terminal window. Press Enter.
+
+2.  **Run the Install Command**:
+    - With the terminal open in your project folder, type the following command and press Enter:
+    
+      pip install -r requirements.txt
+   
+    - This will automatically install Flask, Requests, and ElevenLabs.
+
+### Step 4: Run the App!
+
+You're all set! To start the StrokeGPT server:
+
+1.  **Run the Main Script**:
+    - In the same terminal window, type the following command and press Enter:
+    
+      python app.py
+ 
+    - You'll see some text appear, ending with a line that says `Running on http://127.0.0.1:5000`. This means the server is working! Keep this terminal window open.
+
+2.  **Open the App in Your Browser**:
+    - Open your web browser (like Chrome or Firefox).
+    - Go to this address: `http://127.0.0.1:5000`
+    - The splash screen should appear. Press Enter to begin the on-screen setup guide. Enjoy!

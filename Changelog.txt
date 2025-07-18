@@ -16,5 +16,24 @@ I lost a few braincells getting this working :/
 - Model Recommendation Update: Now recommending llama3:8b-instruct-q4_K_M for the AI, because it's way faster and better at understanding what you want.
 v1.2.5 - Depth Adherence & Stability Hotfix
 
-- Fixed AI Depth Adherence: Made the AI's instructions super clear with examples for "tip," "mid," and "deep" based on your Max Depth setting.
-- It finally understands WHAT MAX DEPTH MEANS! :D
+v1.3 – The Personal Touch & Persona Lock Update
+
+New Feature: Onboarding Setup – The app now starts with a simple guide: set your Handy key, choose an AI persona, and define your minimum and maximum depth. ElevenLabs setup comes next if desired.
+
+Smarter AI Depth Mapping – The AI now knows your actual dick size (or close enough) thanks to the new calibration system. No more confusing tip with base.
+
+Persona Consistency – The AI now always sticks to the persona you choose. If it's a bratty neko, it's staying a bratty neko.
+
+Voice Update: ElevenLabs – Voice output should now be more stable and expressive, including moans and emotional tones when appropriate.
+
+Improved Depth Semantics – Terms like “just the tip” or “go deeper” should now register correctly 85% of the time (yes, it was tested that thoroughly).
+
+Emergency Stop Fix – Clicking “STOP EVERYTHING” now properly halts all motion. If it restarts, unplug your Handy. Seriously.
+
+AutoMode Quirks – Talking to the AI during automode can still make things janky. Fix is coming later.
+
+Experimental: Milking Mode – Still very WIP. If it goes haywire and turns you into a “goon spoon,” just remember: it’s learning.
+
+Memory Saving Fix – Memory snapshots should now save properly rather than overwrite each other. Still being monitored for edge cases.
+
+Overall Polish – Didn’t reinvent the wheel, but it definitely rolls smoother now.
