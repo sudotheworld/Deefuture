@@ -1,39 +1,43 @@
-v1.2 - Fixed AI Depth Understanding: Made it so "tip," "mid," and "deep" strokes actually mean the right thing no matter your Max Depth setting.
-Fixed AI Speed Perception: Told the AI exactly what "slow," "medium," and "fast" speeds are in numbers so it controls the Handy better.
-Removed Unnecessary Speed Cap: Changed how the Handy moves so it can go faster even at shallow depths, for more fun teasing.
-Introduced Max Depth Limiter:
-    Added a "Max Depth" slider on the screen for you to set how far the Handy goes.
-    Built in some code to remember your Max Depth setting even when you close the app.
-    Most importantly, put a hard limit in the Handy control code to make sure it NEVER goes past your Max Depth, no matter what the AI tries to do.
-Resolved UI Interactivity Issues: Fixed some messed-up code in index.html so all the buttons and sliders work right.
-Fixed Preference Saving Errors: Fixed problems that stopped your settings from saving when you closed the app.
-v1.2 - The Ergonomics & Audio Update
+====================
+    CHANGELOG
+====================
 
-- New Feature: ElevenLabs Integration: Added full voice support using ElevenLabs, with settings for your API key and picking voices in a new "Audio Settings" area.
-- New Feature: Advanced In-Session Memory: Added a smart way for the AI to remember what's happening during your chat without slowing your computer down.
-I lost a few braincells getting this working :/
-- UI Overhaul: Made the whole app look new with a two-column design, putting all the settings on the side so the chat window is bigger.
-- Model Recommendation Update: Now recommending llama3:8b-instruct-q4_K_M for the AI, because it's way faster and better at understanding what you want.
-v1.2.5 - Depth Adherence & Stability Hotfix
+=== v1.4 ===
 
-v1.3 – The Personal Touch & Persona Lock Update
+- New Feature: Edging Mode has been added.
+- New Feature: Added user-configurable timers in the UI to control the interval between moves in all special modes (Auto, Edging, Milking).
+- AI now invents every move on the fly. Clicking the Like button saves the move to memory for future use. The more likes a move gets, the more often it will be used.
+- The memory system has been overhauled to use a detailed user profile, which saves important info, personal details, and key memories from your sessions.
+- The AI's persona can now be changed at any time from the sidebar during a chat.
+- All special modes (Auto, Milking, Edging) now function as intended, inventing moves dynamically and respecting user settings.
+- The Stop command is now more reliable.
+- Chatting during special modes is now safe and will not interrupt the active mode.
+- Added min/max speed settings to the onboarding guide.
+- System prompt has been optimized, which may improve response speed on some hardware.
 
-New Feature: Onboarding Setup – The app now starts with a simple guide: set your Handy key, choose an AI persona, and define your minimum and maximum depth. ElevenLabs setup comes next if desired.
 
-Smarter AI Depth Mapping – The AI now knows your actual dick size (or close enough) thanks to the new calibration system. No more confusing tip with base.
+=== v1.3 – The update that borked the app :/ ===
 
-Persona Consistency – The AI now always sticks to the persona you choose. If it's a bratty neko, it's staying a bratty neko.
+- New Feature: Onboarding Setup – The app now starts with a simple guide to set your Handy key, choose a persona, and define your min/max depth.
+- Smarter AI Depth Mapping: The calibration system ensures the AI understands your physical range, so it no longer confuses the tip with the base.
+- Persona Consistency: The AI now strictly adheres to the persona you choose.
+- Voice Update: ElevenLabs voice output is more stable and expressive.
+- Improved Depth Semantics: Commands like just the tip or go deeper are now understood more reliably.
+- Emergency Stop Fix: The STOP EVERYTHING button now correctly halts all motion.
+- Memory Saving Fix: Memory snapshots now save correctly without overwriting each other.
 
-Voice Update: ElevenLabs – Voice output should now be more stable and expressive, including moans and emotional tones when appropriate.
 
-Improved Depth Semantics – Terms like “just the tip” or “go deeper” should now register correctly 85% of the time (yes, it was tested that thoroughly).
+=== v1.2.5 - Depth Adherence & Stability Hotfix ===
 
-Emergency Stop Fix – Clicking “STOP EVERYTHING” now properly halts all motion. If it restarts, unplug your Handy. Seriously.
 
-AutoMode Quirks – Talking to the AI during automode can still make things janky. Fix is coming later.
+=== v1.2 - The Ergonomics & Audio Update ===
 
-Experimental: Milking Mode – Still very WIP. If it goes haywire and turns you into a “goon spoon,” just remember: it’s learning.
-
-Memory Saving Fix – Memory snapshots should now save properly rather than overwrite each other. Still being monitored for edge cases.
-
-Overall Polish – Didn’t reinvent the wheel, but it definitely rolls smoother now.
+- New Feature: ElevenLabs Integration: Added full voice support, with settings for API key and voice selection.
+- New Feature: Advanced In-Session Memory: Added a smarter way for the AI to remember what's happening during your chat.
+- UI Overhaul: Redesigned the app with a two-column layout, moving settings to the sidebar for a larger chat window.
+- Model Recommendation Update: The recommended AI model is now llama3:8b-instruct-q4_K_M for better speed and comprehension.
+- Fixed AI Depth Understanding: Made it so tip, mid, and deep strokes are accurate regardless of your Max Depth setting.
+- Fixed AI Speed Perception: Improved the AI's understanding of slow, medium, and fast speeds for better control.
+- Introduced Max Depth Limiter: Added a Max Depth slider and a hard safety limit in the code to ensure the device never goes past your set depth.
+- Resolved UI Interactivity Issues: Fixed code so all buttons and sliders work correctly.
+- Fixed Preference Saving Errors: Corrected issues that prevented settings from saving properly when closing the app.

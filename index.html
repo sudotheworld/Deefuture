@@ -173,9 +173,10 @@
         }
         .my-button:hover { background-color: #7887ab; }
         .my-button:active { transform: scale(0.98); }
+        .sidebar-button.edging { background-color: #f1fa8c; color: #282a36; }
+        .sidebar-button.edging:hover { background-color: #e0e67e; }
 
-        .input-text, .select-box {
-            flex-grow: 1;
+        .input-text, .select-box, input[type="number"] {
             padding: 8px;
             border: 1px solid #6272a4;
             background-color: #343746;
@@ -214,6 +215,12 @@
         #setup-box { text-align: center; background-color: #282a36; padding: 20px; border-radius: 8px; border: 1px solid #6272a4;}
         #setup-box h2 { color: #8be9fd; }
         #setup-box button { margin-top: 10px; }
+        .slider-container { margin: 15px 0; }
+        
+        .timing-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+        .timing-row label { flex-basis: 50px; font-size: 0.9em; }
+        .timing-row input { flex-grow: 1; width: 40px; }
+        .timing-row span { padding: 0 5px; }
     </style>
 </head>
 <body>
@@ -236,7 +243,7 @@
             <div id="visualizer-box">
                 <canvas id="rhythm-canvas"></canvas>
             </div>
-            <div id="status-text">Status: Waiting for Handy Key.</div>
+            <div id="status-text">Status: Checking for saved settings...</div>
             <div id="message-input-line">
                 <input type="text" id="user-chat-input" class="input-text" placeholder="Type a message or command...">
                 <button id="send-chat-btn" class="my-button">Send</button>
@@ -245,6 +252,35 @@
     </div>
 
     <div id="sidebar">
+        <div class="setting-section">
+            <h3>Persona</h3>
+            <input type="text" id="persona-input" class="input-text" placeholder="Describe the AI's persona...">
+            <button id="set-persona-btn" class="my-button">Set Persona</button>
+        </div>
+
+        <div class="setting-section">
+            <h3>Mode Timings (Seconds)</h3>
+            <div class="timing-row">
+                <label for="auto-min-time">Auto:</label>
+                <input type="number" id="auto-min-time" min="1" max="60" step="1" value="4">
+                <span>-</span>
+                <input type="number" id="auto-max-time" min="1" max="60" step="1" value="7">
+            </div>
+            <div class="timing-row">
+                <label for="edging-min-time">Edging:</label>
+                <input type="number" id="edging-min-time" min="1" max="60" step="1" value="5">
+                <span>-</span>
+                <input type="number" id="edging-max-time" min="1" max="60" step="1" value="8">
+            </div>
+            <div class="timing-row">
+                <label for="milking-min-time">Milking:</label>
+                <input type="number" id="milking-min-time" min="1" max="60" step="1" value="2">
+                <span>-</span>
+                <input type="number" id="milking-max-time" min="1" max="60" step="1" value="5">
+            </div>
+            <button id="save-timings-btn" class="my-button">Save Timings</button>
+        </div>
+
         <div class="setting-section">
             <h3>Voice Output (ElevenLabs)</h3>
             <input type="password" id="elevenlabs-key-input" class="input-text" placeholder="ElevenLabs API Key">
@@ -271,6 +307,7 @@
 
         <div class="setting-section" style="margin-top: auto;">
             <h3>DANGER ZONE</h3>
+            <button id="edging-mode-btn" class="my-button sidebar-button edging" style="margin-bottom: 10px;">Edge Me</button>
             <button id="milking-mode-btn" class="my-button sidebar-button milking" style="margin-bottom: 10px;">Milk Me</button>
             <button id="emergency-stop-all-btn" class="my-button sidebar-button stop">STOP EVERYTHING</button>
         </div>
@@ -294,12 +331,16 @@
         const ctx = rhythmCanvas.getContext('2d');
         const emergencyStopAllBtn = document.getElementById('emergency-stop-all-btn');
         const milkingModeBtn = document.getElementById('milking-mode-btn');
+        const edgingModeBtn = document.getElementById('edging-mode-btn');
         const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
         const elevenLabsKeyInput = document.getElementById('elevenlabs-key-input');
         const setElevenLabsKeyButton = document.getElementById('set-elevenlabs-key-button');
         const elevenlabsVoiceSelectBox = document.getElementById('elevenlabs-voice-select-box');
         const enableAudioCheckbox = document.getElementById('enable-audio-checkbox');
         const splashScreen = document.getElementById('splash-screen');
+        const personaInput = document.getElementById('persona-input');
+        const setPersonaBtn = document.getElementById('set-persona-btn');
+        const saveTimingsBtn = document.getElementById('save-timings-btn');
 
         let myHandyKey = '';
         let myPersonaDescription = 'An energetic and passionate girlfriend';
@@ -311,8 +352,10 @@
 
         let setupStep = 1;
         let tempDepth = 50;
-        let setupMin = 0;
-        let setupMax = 100;
+        let setupMinDepth = 0;
+        let setupMaxDepth = 100;
+        let setupMinSpeed = 10;
+        let setupMaxSpeed = 80;
         const setupOverlay = document.getElementById('setup-overlay');
         const setupBox = document.getElementById('setup-box');
 
@@ -362,7 +405,11 @@
         }
 
         async function sendUserMessage(message) {
-            if (!myHandyKey) { addChatMessage('BOT', 'Please complete the setup first!'); return; }
+            // Block only while the setup overlay is still shown
+            if (!myHandyKey && setupOverlay.style.display !== 'none' && message.trim() !== '') {
+                addChatMessage('BOT', 'Please complete the setup first!');
+                return;
+            }
             if (message.trim() !== '') {
                 addChatMessage('YOU', message);
                 userChatInput.value = '';
@@ -457,8 +504,12 @@
             } catch (e) {}
         }
 
-        function renderSetup() {
-            setupOverlay.style.display = 'flex'; // Show the guide overlay
+        function renderSetup(isReturningUser = false, savedPersona = 'An energetic and passionate girlfriend') {
+            setupOverlay.style.display = 'flex';
+            if (isReturningUser) {
+                setupStep = 2;
+            }
+
             if (setupStep === 1) {
                 setupBox.innerHTML = `<h2>Step 1: Handy Key</h2>` +
                     `<p>Please enter your connection key from handyfeeling.com</p>` +
@@ -468,40 +519,73 @@
                     const k = document.getElementById('setup-key').value.trim();
                     if (!k) return;
                     myHandyKey = k;
-                    fetch('/send_message', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:'', key:k})});
+                    sendUserMessage('');
                     setupStep = 2; renderSetup();
                 };
             } else if (setupStep === 2) {
                 setupBox.innerHTML = `<h2>Step 2: Persona</h2>` +
-                    `<p>Describe the personality of your AI partner.</p>` +
-                    `<input type="text" id="setup-persona" class="input-text" value="An energetic and passionate girlfriend" placeholder="Describe persona"><br>` +
+                    `<p>Describe the personality of your AI partner for this session.</p>` +
+                    `<input type="text" id="setup-persona" class="input-text" value="${savedPersona}" placeholder="Describe persona"><br>` +
                     `<button id="setup-next" class="my-button">Next</button>`;
                 document.getElementById('setup-next').onclick = () => {
                     const p = document.getElementById('setup-persona').value.trim() || 'An energetic and passionate girlfriend';
                     myPersonaDescription = p;
-                    fetch('/send_message', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:'', key: myHandyKey, persona_desc: p})});
-                    setupStep = 3; renderSetup();
+                    personaInput.value = myPersonaDescription;
+                    sendUserMessage('');
+                    if (isReturningUser) {
+                        setupOverlay.style.display = 'none';
+                        statusText.textContent = `Persona set. Ready to chat.`;
+                    } else {
+                        setupStep = 3; renderSetup();
+                    }
                 };
             } else if (setupStep === 3) {
-                setupBox.innerHTML = `<h2>Step 3: Set MIN Depth</h2>` +
-                    `<p>Move the slider to your shallowest comfortable position and click Set.</p>` +
+                setupBox.innerHTML = `<h2>Step 3: Set the Tip</h2>` +
+                    `<p>Move the Handy so the sleeve is at the very tip of your penis, then click 'Set Tip'.</p>` +
                     `<div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button> <span id="d-val" style="padding: 0 15px;">${tempDepth}</span>% <button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div>` +
-                    `<button id="set-min" class="my-button">Set Min</button>`;
+                    `<button id="set-min" class="my-button">Set Tip</button>`;
                 document.getElementById('d-up').onclick = () => { sendNudge('up'); };
                 document.getElementById('d-down').onclick = () => { sendNudge('down'); };
-                document.getElementById('set-min').onclick = () => { setupMin = tempDepth; setupStep = 4; renderSetup(); };
+                document.getElementById('set-min').onclick = () => { setupMinDepth = tempDepth; setupStep = 4; renderSetup(); };
             } else if (setupStep === 4) {
-                setupBox.innerHTML = `<h2>Step 4: Set MAX Depth</h2>` +
-                    `<p>Move the slider to your deepest comfortable position and click Finish.</p>` +
+                setupBox.innerHTML = `<h2>Step 4: Set the Base</h2>` +
+                    `<p>Now move the Handy so the sleeve is at the base of your penis, then click 'Next'.</p>` +
                     `<div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button> <span id="d-val" style="padding: 0 15px;">${tempDepth}</span>% <button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div>` +
-                    `<button id="finish" class="my-button">Finish Setup</button>`;
+                    `<button id="set-max" class="my-button">Next</button>`;
                 document.getElementById('d-up').onclick = () => { sendNudge('up'); };
                 document.getElementById('d-down').onclick = () => { sendNudge('down'); };
+                document.getElementById('set-max').onclick = () => {
+                    setupMaxDepth = tempDepth;
+                    fetch('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({min_depth: setupMinDepth, max_depth: setupMaxDepth})});
+                    setupStep = 5; renderSetup();
+                };
+            } else if (setupStep === 5) {
+                setupBox.innerHTML = `<h2>Step 5: Set Minimum Speed</h2>` +
+                    `<p>Choose the slowest speed you're comfortable with.</p>` +
+                    `<div class="slider-container"><input type="range" min="0" max="100" value="${setupMinSpeed}" class="slider" id="min-speed-slider"> <span id="min-speed-val">${setupMinSpeed}%</span></div>` +
+                    `<button id="set-min-speed" class="my-button">Next</button>`;
+                const minSlider = document.getElementById('min-speed-slider');
+                const minSpeedVal = document.getElementById('min-speed-val');
+                minSlider.oninput = () => {
+                    setupMinSpeed = minSlider.value;
+                    minSpeedVal.textContent = `${setupMinSpeed}%`;
+                };
+                document.getElementById('set-min-speed').onclick = () => { setupStep = 6; renderSetup(); };
+            } else if (setupStep === 6) {
+                setupBox.innerHTML = `<h2>Step 6: Set Maximum Speed</h2>` +
+                    `<p>Choose the fastest speed you're comfortable with.</p>` +
+                    `<div class="slider-container"><input type="range" min="0" max="100" value="${setupMaxSpeed}" class="slider" id="max-speed-slider"> <span id="max-speed-val">${setupMaxSpeed}%</span></div>` +
+                    `<button id="finish" class="my-button">Finish Setup</button>`;
+                const maxSlider = document.getElementById('max-speed-slider');
+                const maxSpeedVal = document.getElementById('max-speed-val');
+                maxSlider.oninput = () => {
+                    setupMaxSpeed = maxSlider.value;
+                    maxSpeedVal.textContent = `${setupMaxSpeed}%`;
+                };
                 document.getElementById('finish').onclick = () => {
-                    setupMax = tempDepth;
-                    fetch('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({min_depth: setupMin, max_depth: setupMax})});
+                    fetch('/set_speed_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({min_speed: setupMinSpeed, max_speed: setupMaxSpeed})});
                     setupOverlay.style.display = 'none';
-                    statusText.textContent = `Status: Setup complete! Range: ${setupMin}% - ${setupMax}%. Ready to chat.`;
+                    statusText.textContent = `Status: Setup complete! Range: ${setupMinDepth}%-${setupMaxDepth}%. Speed: ${setupMinSpeed}%-${setupMaxSpeed}%. Ready to chat.`;
                 };
             }
         }
@@ -517,12 +601,8 @@
             try {
                 const response = await fetch('/like_last_move', { method: 'POST' });
                 const data = await response.json();
-                if (data.status === 'learned') {
-                    statusText.textContent = `Cool! Learned a new move: ${data.name}`;
-                    likeThisMoveBtn.classList.add('liked');
-                    setTimeout(() => { likeThisMoveBtn.classList.remove('liked'); }, 500);
-                } else if (data.status === 'failed_to_learn') {
-                    statusText.textContent = "Status: AI couldn't learn that one.";
+                if (data.status === 'boosted') {
+                    statusText.textContent = `Saved '${data.name}' to my memory!`;
                 } else {
                     statusText.textContent = "Status: No active auto move to like.";
                 }
@@ -543,6 +623,18 @@
         emergencyStopAllBtn.addEventListener('click', () => {
             sendUserMessage('stop');
             statusText.textContent = "Status: EMERGENCY STOP ACTIVATED!";
+        });
+
+        edgingModeBtn.addEventListener('click', async () => {
+            if (!myHandyKey) { addChatMessage('BOT', 'Please complete the setup first!'); return; }
+            try {
+                await fetch('/start_edging_mode', { method: 'POST' });
+                statusText.textContent = "Status: Edging mode is ON!";
+            }
+            catch (error) {
+                console.error('Error starting edging mode:', error);
+                addChatMessage('BOT', 'Error: Could not start edging mode.');
+            }
         });
 
         milkingModeBtn.addEventListener('click', async () => {
@@ -574,6 +666,35 @@
             }
         });
 
+        setPersonaBtn.addEventListener('click', () => {
+            const newPersona = personaInput.value.trim();
+            if (newPersona && newPersona !== myPersonaDescription) {
+                myPersonaDescription = newPersona;
+                sendUserMessage(''); // Send empty message to update backend
+                statusText.textContent = `Persona updated!`;
+            }
+        });
+
+        saveTimingsBtn.addEventListener('click', async () => {
+            const timings = {
+                auto_min: document.getElementById('auto-min-time').value,
+                auto_max: document.getElementById('auto-max-time').value,
+                edging_min: document.getElementById('edging-min-time').value,
+                edging_max: document.getElementById('edging-max-time').value,
+                milking_min: document.getElementById('milking-min-time').value,
+                milking_max: document.getElementById('milking-max-time').value,
+            };
+            try {
+                await fetch('/set_mode_timings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(timings)
+                });
+                statusText.textContent = 'Mode timings saved!';
+            } catch (error) {
+                statusText.textContent = 'Error saving timings.';
+            }
+        });
 
         setElevenLabsKeyButton.addEventListener('click', async () => {
             const apiKey = elevenLabsKeyInput.value.trim();
@@ -630,12 +751,50 @@
         elevenlabsVoiceSelectBox.addEventListener('change', updateAudioSettings);
         enableAudioCheckbox.addEventListener('change', updateAudioSettings);
 
-        function handleStart() {
-            splashScreen.classList.add('hidden');
-            // Wait for the fade out to finish before starting the setup
-            setTimeout(() => {
-                renderSetup();
-            }, 1000); // Matches the CSS transition duration
+        async function startupCheck() {
+            try {
+                const response = await fetch('/check_settings');
+                const data = await response.json();
+                if (data.configured) {
+                    splashScreen.style.display = 'none';
+                    statusText.textContent = 'Welcome back! Your settings have been loaded.';
+                    
+                    myHandyKey = data.handy_key;
+                    myPersonaDescription = data.persona;
+                    personaInput.value = myPersonaDescription;
+
+                    if (data.timings) {
+                        document.getElementById('auto-min-time').value = data.timings.auto_min;
+                        document.getElementById('auto-max-time').value = data.timings.auto_max;
+                        document.getElementById('edging-min-time').value = data.timings.edging_min;
+                        document.getElementById('edging-max-time').value = data.timings.edging_max;
+                        document.getElementById('milking-min-time').value = data.timings.milking_min;
+                        document.getElementById('milking-max-time').value = data.timings.milking_max;
+                    }
+
+                    renderSetup(true, data.persona);
+                } else {
+                    // No settings, start with splash screen
+                    const startHandler = (e) => {
+                        if (e.key === 'Enter') {
+                            document.removeEventListener('keydown', startHandler);
+                            splashScreen.classList.add('hidden');
+                            setTimeout(() => renderSetup(false), 1000);
+                        }
+                    };
+                    document.addEventListener('keydown', startHandler);
+                }
+            } catch (e) {
+                console.error("Could not check settings, proceeding with normal startup.", e);
+                 const startHandler = (e) => {
+                    if (e.key === 'Enter') {
+                        document.removeEventListener('keydown', startHandler);
+                        splashScreen.classList.add('hidden');
+                        setTimeout(() => renderSetup(false), 1000);
+                    }
+                };
+                document.addEventListener('keydown', startHandler);
+            }
         }
 
         window.addEventListener('resize', resizeCanvas);
@@ -644,15 +803,7 @@
             drawHandyVisualizer(0, 100);
             setInterval(getNewUpdates, 1500);
             setInterval(getMyStatus, 500);
-
-            // Listen for Enter key to start the app
-            const startHandler = (e) => {
-                if (e.key === 'Enter') {
-                    document.removeEventListener('keydown', startHandler);
-                    handleStart();
-                }
-            };
-            document.addEventListener('keydown', startHandler);
+            startupCheck();
         });
     </script>
 </body>
