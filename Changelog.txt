@@ -2,6 +2,11 @@
     CHANGELOG
 ====================
 
+=== v1.4.1 ===
+
+- The AI can now focus on working the entire shaft.
+- Noted the app/index files so hard their future generations will walk with a limp. 
+
 === v1.4 ===
 
 - New Feature: Edging Mode has been added.
