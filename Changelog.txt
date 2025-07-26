@@ -2,16 +2,38 @@
     CHANGELOG
 ====================
 
+=== v1.5 - The Refactor & Interactivity Update ===
+
+- Major Architectural Overhaul: The entire application was refactored from a single mahoosive file into a multi-module structure. This makes it more stable and easier to update in the future. (I wept a little.)
+- New Feature: Advanced Interactive Edging Mode! The old, predictable loop is gone. Edging is now a proper game:
+    - A new "I'm Close" button lets you signal the AI when you're near the edge.
+    - The AI is now unpredictable and will react to your signal by choosing to pull back, hold you on the edge, or even push you a little further.
+    - Chat messages sent during any mode (Auto, Milking, Edging) will now influence the AI's behavior in real-time.
+- New Feature: AI-Aware Edging Timer - A timer now appears during edging, and the AI is aware of it, allowing it to comment on your performance.
+- New Feature: Custom AI Name & Profile Picture - You can now set a custom name and upload a profile picture for the AI in the sidebar. The name replaces "BOT" in the chat.
+- UI Overhaul: The entire interface has been polished with a more modern design, better fonts, softer elements, and smoother animations.
+- Collapsible Sidebar: The sidebar can now be hidden to focus on the chat.
+- Added an AI typing indicator and animated messages to make the chat feel more alive.
+- The title has been updated to the much sleeker "StrokeGPT".
+- Added a few secret chat commands and naming conventions for users with particular tastes in classic gaming.
+- CRITICAL SAFETY FIX: The "Stop" command is now top priority and will correctly interrupt all modes, including the new interactive edging mode.
+- Fixed a persistent bug that caused the onboarding wizard to appear on every startup.
+- Fixed numerous issues where the AI would stop moving if it received an incomplete command from a user's request.
+- Massively improved the AI's long-term memory. It should no longer get confused about who is who or forget details from the chat (still not perfect).
+- The "Like" button now actually works and saves patterns correctly.
+- Jeez, that was a lot...
+
 === v1.4.1 ===
 
 - The AI can now focus on working the entire shaft.
-- Noted the app/index files so hard their future generations will walk with a limp. 
+- Noted the app/index files so hard their future generations will walk with a limp.
 
 === v1.4 ===
 
 - New Feature: Edging Mode has been added.
 - New Feature: Added user-configurable timers in the UI to control the interval between moves in all special modes (Auto, Edging, Milking).
-- AI now invents every move on the fly. Clicking the Like button saves the move to memory for future use. The more likes a move gets, the more often it will be used.
+- AI now invents every move on the fly. Clicking the Like button saves the move to memory for future use.
+- The more likes a move gets, the more often it will be used.
 - The memory system has been overhauled to use a detailed user profile, which saves important info, personal details, and key memories from your sessions.
 - The AI's persona can now be changed at any time from the sidebar during a chat.
 - All special modes (Auto, Milking, Edging) now function as intended, inventing moves dynamically and respecting user settings.
@@ -19,7 +41,6 @@
 - Chatting during special modes is now safe and will not interrupt the active mode.
 - Added min/max speed settings to the onboarding guide.
 - System prompt has been optimized, which may improve response speed on some hardware.
-
 
 === v1.3 – The update that borked the app :/ ===
 
@@ -30,7 +51,6 @@
 - Improved Depth Semantics: Commands like just the tip or go deeper are now understood more reliably.
 - Emergency Stop Fix: The STOP EVERYTHING button now correctly halts all motion.
 - Memory Saving Fix: Memory snapshots now save correctly without overwriting each other.
-
 
 === v1.2.5 - Depth Adherence & Stability Hotfix ===
 

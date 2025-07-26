@@ -5,306 +5,188 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Handy AI Chat</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+        :root {
+            --background-darker: #21222C;
+            --background: #282a36;
+            --background-lighter: #343746;
+            --foreground: #f8f8f2;
+            --comment: #6272a4;
+            --cyan: #8be9fd;
+            --purple: #bd93f9;
+            --pink: #ff79c6;
+            --red: #ff5555;
+            --yellow: #f1fa8c;
+            --shadow: rgba(0, 0, 0, 0.2);
+        }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: sans-serif;
-            background-color: #282a36;
-            color: #f8f8f2;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-darker);
+            color: var(--foreground);
             margin: 0;
             height: 100vh;
             overflow: hidden;
-            display: flex;
-            flex-direction: row;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            transition: grid-template-columns 0.35s ease-in-out;
         }
+        body.sidebar-collapsed { grid-template-columns: 1fr 0px; }
 
-        #splash-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            transition: opacity 1s ease-out;
-            opacity: 1;
-        }
+        #splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; transition: opacity 1s ease-out; opacity: 1; }
+        #splash-screen.hidden { opacity: 0; pointer-events: none; }
+        #splash-screen img { max-width: 90%; max-height: 70%; object-fit: contain; border-radius: 16px; }
+        #splash-screen p { margin-top: 20px; font-size: 2rem; color: #fff; text-shadow: 0 0 10px var(--pink), 0 0 20px var(--pink); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
 
-        #splash-screen.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
+        #main-area { flex-grow: 1; display: flex; flex-direction: column; height: 100%; background-color: var(--background); overflow: hidden; }
+        
+        #sidebar { padding: 20px; background-color: var(--background-darker); overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 20px; border-left: 1px solid var(--background-lighter); }
+       
+        #top-bar { padding: 10px 20px; background-color: var(--background); border-bottom: 1px solid var(--background-lighter); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; position: relative; }
+        #toggle-sidebar-btn { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); background: var(--background-lighter); border: none; color: var(--foreground); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transition: transform 0.3s ease-in-out, background-color 0.2s ease; font-size: 1.2em; display: flex; align-items: center; justify-content: center; }
+        #toggle-sidebar-btn:hover { background-color: var(--comment); }
+        body.sidebar-collapsed #toggle-sidebar-btn { transform: translateY(-50%) rotate(180deg); }
 
-        #splash-screen img {
-            max-width: 90%;
-            max-height: 70%;
-            object-fit: contain;
-        }
+        #top-bar h1 { margin: 0; font-size: 1.5rem; color: var(--cyan); font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 5px rgba(139, 233, 253, 0.4); }
+        #top-bar .top-bar-info { display: flex; align-items: center; gap: 15px; margin-right: 45px; }
+        #mood-display, #edging-timer { background-color: var(--background-lighter); padding: 6px 12px; border-radius: 8px; font-size: 0.9em; }
+        #edging-timer { color: var(--yellow); font-weight: 600; }
 
-        #splash-screen p {
-            margin-top: 20px;
-            font-size: 2rem;
-            color: #fff;
-            text-shadow: 0 0 10px #ff79c6, 0 0 20px #ff79c6;
-            animation: pulse 2s infinite;
-        }
+        #chat-view { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        #bottom-input-area { padding: 20px; border-top: 1px solid var(--background-lighter); background-color: var(--background); flex-shrink: 0; }
 
-        @keyframes pulse {
-            0% { opacity: 0.7; }
-            50% { opacity: 1; }
-            100% { opacity: 0.7; }
-        }
+        .chat-message-container { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 15px; max-width: 85%; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .chat-pfp { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .message-content { display: flex; flex-direction: column; }
+        .message-bubble { padding: 12px 16px; border-radius: 18px; line-height: 1.5; word-wrap: break-word; }
+        .message-bubble pre { font-family: 'Courier New', Courier, monospace; font-size: 0.9em; text-align: left; white-space: pre; }
+        
+        .bot-bubble { align-self: flex-start; }
+        .bot-bubble .message-bubble { background-color: var(--background-lighter); border-top-left-radius: 4px; }
+        .bot-bubble .speaker-name { align-self: flex-start; }
 
-        #main-area {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            border-right: 1px solid #44475a;
-        }
-
-        #sidebar {
-            width: 300px;
-            flex-shrink: 0;
-            padding: 15px;
-            background-color: #383a59;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        #top-bar {
-            padding: 15px;
-            background-color: #44475a;
-            border-bottom: 1px solid #6272a4;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        #top-bar h1 { margin: 0; font-size: 1.5rem; color: #8be9fd; }
-        #mood-display {
-            background-color: #44475a;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.9em;
-            border: 1px solid #6272a4;
-        }
-
-        #chat-view {
-            flex-grow: 1;
-            padding: 15px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #bottom-input-area {
-            padding: 15px;
-            border-top: 1px solid #6272a4;
-            background-color: #44475a;
-        }
-
-        .chat-message-container {
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 10px;
-        }
-        .message-bubble {
-            max-width: 80%;
-            padding: 10px;
-            border-radius: 10px;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-        .bot-bubble .message-bubble {
-            background-color: #343746;
-            align-self: flex-start;
-            border-bottom-left-radius: 2px;
-        }
-        .user-bubble .message-bubble {
-            background-color: #505260;
-            color: #fff;
-            align-self: flex-end;
-            border-bottom-right-radius: 2px;
-        }
-        .speaker-name {
-            font-size: 0.8em;
-            margin-bottom: 3px;
-            color: #bd93f9;
-        }
-        .user-bubble .speaker-name { text-align: right; }
-
-        #visualizer-box {
-            height: 40px;
-            background-color: #383a59;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            padding: 5px;
-            border: 1px solid #6272a4;
-        }
-
-        .setting-section {
-            border: 1px solid #6272a4;
-            border-radius: 6px;
-            padding: 10px;
-            background-color: #282a36;
-        }
-        .setting-section h3 {
-            margin-top: 0; margin-bottom: 10px; font-size: 1.1rem;
-            color: #8be9fd;
-            border-bottom: 1px solid #6272a4;
-            padding-bottom: 5px;
-        }
-
-        .my-button {
-            padding: 8px 12px;
-            border: none;
-            background-color: #6272a4;
-            color: #f8f8f2;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            font-size: 1em;
-            width: 100%;
-        }
-        .my-button:hover { background-color: #7887ab; }
-        .my-button:active { transform: scale(0.98); }
-        .sidebar-button.edging { background-color: #f1fa8c; color: #282a36; }
-        .sidebar-button.edging:hover { background-color: #e0e67e; }
-
-        .input-text, .select-box, input[type="number"] {
-            padding: 8px;
-            border: 1px solid #6272a4;
-            background-color: #343746;
-            color: #f8f8f2;
-            border-radius: 4px;
-            font-size: 1em;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        #message-input-line {
-            display: flex;
-            gap: 10px;
-        }
-        #message-input-line .my-button { width: auto; flex-shrink: 0; }
-
-        .sidebar-button.milking { background-color: #ff79c6; }
-        .sidebar-button.stop { background-color: #ff5555; }
+        .user-bubble { align-self: flex-end; }
+        .user-bubble .message-bubble { background-color: var(--comment); color: var(--foreground); border-top-right-radius: 4px; }
+        
+        .speaker-name { font-size: 0.8em; margin-bottom: 4px; color: var(--purple); font-weight: 600; }
+        .user-bubble .speaker-name { align-self: flex-end; }
+        
+        #visualizer-box { height: 40px; background-color: var(--background-darker); border-radius: 8px; margin-bottom: 15px; padding: 5px; }
+        .setting-section { border-radius: 12px; padding: 15px; background-color: var(--background); box-shadow: 0 4px 12px var(--shadow); }
+        .setting-section h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; font-weight: 600; color: var(--cyan); border-bottom: 1px solid var(--background-lighter); padding-bottom: 10px; }
+        
+        .my-button { padding: 10px 16px; border: none; background-color: var(--comment); color: var(--foreground); border-radius: 8px; cursor: pointer; transition: all 0.2s ease; font-size: 1em; font-weight: 600; width: 100%; box-shadow: 0 2px 4px var(--shadow); }
+        .my-button:hover { background-color: #798dcc; transform: translateY(-2px); box-shadow: 0 4px 8px var(--shadow); }
+        .my-button:active { transform: translateY(0); box-shadow: 0 2px 4px var(--shadow); }
+        .sidebar-button.edging { background-color: var(--yellow); color: var(--background); }
+        .sidebar-button.edging:hover { background-color: #f7ffae; }
+        .sidebar-button.milking { background-color: var(--pink); }
         .sidebar-button.milking:hover { background-color: #ff92d0; }
+        .sidebar-button.stop { background-color: var(--red); }
         .sidebar-button.stop:hover { background-color: #ff6e6e; }
 
-        .audio-toggle-line { display: flex; align-items: center; gap: 8px; }
+        .input-text, .select-box, input[type="number"] { padding: 10px; border: 1px solid var(--background-lighter); background-color: var(--background-lighter); color: var(--foreground); border-radius: 8px; font-size: 1em; width: 100%; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .input-text:focus, .select-box:focus, input[type="number"]:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.3); }
 
-        #status-text { margin-top: 10px; font-size: 0.9em; text-align: center; color: #bd93f9; }
-        #setup-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            display: none; /* Initially hidden */
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            color: #f8f8f2;
-        }
-        #setup-box { text-align: center; background-color: #282a36; padding: 20px; border-radius: 8px; border: 1px solid #6272a4;}
-        #setup-box h2 { color: #8be9fd; }
-        #setup-box button { margin-top: 10px; }
+        #message-input-line { display: flex; gap: 10px; align-items: center; }
+        #message-input-line .my-button { width: auto; flex-shrink: 0; }
+        #message-input-line .input-text { flex-grow: 1; }
+
+        .audio-toggle-line { display: flex; align-items: center; gap: 8px; padding-top: 10px; }
+
+        #status-text { margin-top: 15px; font-size: 0.9em; text-align: center; color: var(--purple); }
+        #setup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 9999; color: var(--foreground); }
+        #setup-box { text-align: center; background-color: var(--background); padding: 30px; border-radius: 12px; border: 1px solid var(--background-lighter); box-shadow: 0 8px 32px var(--shadow); }
+        #setup-box h2 { color: var(--cyan); margin-top: 0; }
+        #setup-box button { margin-top: 15px; }
         .slider-container { margin: 15px 0; }
         
-        .timing-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+        .timing-row { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
         .timing-row label { flex-basis: 50px; font-size: 0.9em; }
         .timing-row input { flex-grow: 1; width: 40px; }
         .timing-row span { padding: 0 5px; }
+
+        .typing-dots span { display: inline-block; animation: blink 1.4s infinite both; font-size: 1.5em; line-height: 0; }
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0% { opacity: 0.2; } 20% { opacity: 1; } 100% { opacity: 0.2; } }
+
+        #easter-egg-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; font-family: 'Courier New', monospace; font-size: 1.5em; display: none; align-items: center; justify-content: center; z-index: 10001; opacity: 0; transition: opacity 1s ease-in-out; text-align: center; }
+
     </style>
 </head>
 <body>
     <div id="splash-screen">
-        <img src="/static/splash.jpg.jpg" alt="StrokeGPT">
+        <img src="/static/splash.jpg" alt="StrokeGPT">
         <p>Press Enter to Begin</p>
     </div>
-
     <div id="main-area">
         <div id="top-bar">
-            <h1>My Handy AI Chat</h1>
-            <div id="mood-display">Mood: ...</div>
-        </div>
-
-        <div id="chat-view">
-            <div id="chat-messages-container"></div>
-        </div>
-
-        <div id="bottom-input-area">
-            <div id="visualizer-box">
-                <canvas id="rhythm-canvas"></canvas>
+            <h1>StrokeGPT</h1>
+            <div class="top-bar-info">
+                <div id="edging-timer" style="display: none;">00:00</div>
+                <div id="mood-display">Mood: ...</div>
             </div>
-            <div id="status-text">Status: Checking for saved settings...</div>
+            <button id="toggle-sidebar-btn">&laquo;</button>
+        </div>
+        <div id="chat-view">
+            <div id="chat-messages-container">
+                <div id="typing-indicator" class="chat-message-container bot-bubble" style="display: none;">
+                    <img class="chat-pfp" id="typing-indicator-pfp" src="/static/default-pfp.png" alt="pfp">
+                    <div class="message-content">
+                        <p class="speaker-name">BOT</p>
+                        <p class="message-bubble typing-dots"><span>.</span><span>.</span><span>.</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="bottom-input-area">
+            <div id="visualizer-box"><canvas id="rhythm-canvas"></canvas></div>
             <div id="message-input-line">
                 <input type="text" id="user-chat-input" class="input-text" placeholder="Type a message or command...">
                 <button id="send-chat-btn" class="my-button">Send</button>
             </div>
+             <div id="status-text">Status: Checking for saved settings...</div>
         </div>
     </div>
-
     <div id="sidebar">
         <div class="setting-section">
             <h3>Persona</h3>
+            <label for="pfp-upload" style="cursor: pointer; display: block; margin-bottom: 15px;">
+                <img id="ai-pfp-preview" src="/static/default-pfp.png" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 10px auto; display: block; border: 2px solid var(--comment);">
+            </label>
+            <input type="file" id="pfp-upload" accept="image/*" style="display: none;">
+            <input type="text" id="ai-name-input" class="input-text" placeholder="AI's Name..." style="margin-bottom: 10px;">
+            <button id="set-ai-name-btn" class="my-button" style="margin-bottom: 15px;">Set Name</button>
             <input type="text" id="persona-input" class="input-text" placeholder="Describe the AI's persona...">
-            <button id="set-persona-btn" class="my-button">Set Persona</button>
+            <button id="set-persona-btn" class="my-button" style="margin-top: 10px;">Set Persona</button>
         </div>
-
         <div class="setting-section">
             <h3>Mode Timings (Seconds)</h3>
-            <div class="timing-row">
-                <label for="auto-min-time">Auto:</label>
-                <input type="number" id="auto-min-time" min="1" max="60" step="1" value="4">
-                <span>-</span>
-                <input type="number" id="auto-max-time" min="1" max="60" step="1" value="7">
-            </div>
-            <div class="timing-row">
-                <label for="edging-min-time">Edging:</label>
-                <input type="number" id="edging-min-time" min="1" max="60" step="1" value="5">
-                <span>-</span>
-                <input type="number" id="edging-max-time" min="1" max="60" step="1" value="8">
-            </div>
-            <div class="timing-row">
-                <label for="milking-min-time">Milking:</label>
-                <input type="number" id="milking-min-time" min="1" max="60" step="1" value="2">
-                <span>-</span>
-                <input type="number" id="milking-max-time" min="1" max="60" step="1" value="5">
-            </div>
+            <div class="timing-row"><label for="auto-min-time">Auto:</label><input type="number" id="auto-min-time" min="1" max="60" step="1" value="4"><span>-</span><input type="number" id="auto-max-time" min="1" max="60" step="1" value="7"></div>
+            <div class="timing-row"><label for="edging-min-time">Edging:</label><input type="number" id="edging-min-time" min="1" max="60" step="1" value="5"><span>-</span><input type="number" id="edging-max-time" min="1" max="60" step="1" value="8"></div>
+            <div class="timing-row"><label for="milking-min-time">Milking:</label><input type="number" id="milking-min-time" min="1" max="60" step="1" value="2"><span>-</span><input type="number" id="milking-max-time" min="1" max="60" step="1" value="5"></div>
             <button id="save-timings-btn" class="my-button">Save Timings</button>
         </div>
-
         <div class="setting-section">
             <h3>Voice Output (ElevenLabs)</h3>
             <input type="password" id="elevenlabs-key-input" class="input-text" placeholder="ElevenLabs API Key">
             <button id="set-elevenlabs-key-button" class="my-button">Set Key</button>
             <select id="elevenlabs-voice-select-box" class="select-box" disabled><option>Set API Key to load voices...</option></select>
-            <div class="audio-toggle-line">
-                <input type="checkbox" id="enable-audio-checkbox">
-                <label for="enable-audio-checkbox">Enable Audio</label>
-            </div>
+            <div class="audio-toggle-line"><input type="checkbox" id="enable-audio-checkbox"><label for="enable-audio-checkbox">Enable Audio</label></div>
         </div>
-
         <div class="setting-section">
             <h3>Control Actions</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <button id="start-auto-btn" class="my-button" style="flex: 1;">Start Auto</button>
-                <button id="stop-auto-btn" class="my-button" style="flex: 1;">Stop Auto</button>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button id="like-this-move-btn" class="my-button" style="flex: 1;">👍 Like</button>
-                <button id="toggle-memory-btn" class="my-button" style="flex: 1;">Memories: ON</button>
-            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;"><button id="start-auto-btn" class="my-button" style="flex: 1;">Start Auto</button><button id="stop-auto-btn" class="my-button" style="flex: 1;">Stop Auto</button></div>
+            <div style="display: flex; gap: 10px;"><button id="like-this-move-btn" class="my-button" style="flex: 1;">👍 Like</button><button id="toggle-memory-btn" class="my-button" style="flex: 1;">Memories: ON</button></div>
+            <button id="im-close-btn" class="my-button sidebar-button milking" style="display: none; margin-top: 10px;">I'm Close!</button>
         </div>
-
-
         <div class="setting-section" style="margin-top: auto;">
             <h3>DANGER ZONE</h3>
             <button id="edging-mode-btn" class="my-button sidebar-button edging" style="margin-bottom: 10px;">Edge Me</button>
@@ -312,581 +194,312 @@
             <button id="emergency-stop-all-btn" class="my-button sidebar-button stop">STOP EVERYTHING</button>
         </div>
     </div>
-
-    <div id="setup-overlay">
-        <div id="setup-box"></div>
-    </div>
-
+    <div id="setup-overlay"><div id="setup-box"></div></div>
+    <div id="easter-egg-overlay"></div>
     <script>
-        // ─── GLOBALS & DOM REFERENCES ──────────────────────────────────────────────────────────────
-        // All the querySelector lookups. Keep them here so they're easy to find.
-        const chatView = document.getElementById('chat-view');
-        const chatMessagesContainer = document.getElementById('chat-messages-container');
-        const userChatInput = document.getElementById('user-chat-input');
-        const sendChatBtn = document.getElementById('send-chat-btn');
-        const startAutoBtn = document.getElementById('start-auto-btn');
-        const stopAutoBtn = document.getElementById('stop-auto-btn');
-        const likeThisMoveBtn = document.getElementById('like-this-move-btn');
-        const statusText = document.getElementById('status-text');
-        const moodDisplay = document.getElementById('mood-display');
-        const rhythmCanvas = document.getElementById('rhythm-canvas');
+        const D = document;
+        const userChatInput = D.getElementById('user-chat-input');
+        const personaInput = D.getElementById('persona-input');
+        const setPersonaBtn = D.getElementById('set-persona-btn');
+        const aiNameInput = D.getElementById('ai-name-input');
+        const setAiNameBtn = D.getElementById('set-ai-name-btn');
+        const elevenLabsKeyInput = D.getElementById('elevenlabs-key-input');
+        const setElevenLabsKeyButton = D.getElementById('set-elevenlabs-key-button');
+        const setupOverlay = D.getElementById('setup-overlay');
+        const setupBox = D.getElementById('setup-box');
+        const statusText = D.getElementById('status-text');
+        const moodDisplay = D.getElementById('mood-display');
+        const rhythmCanvas = D.getElementById('rhythm-canvas');
+        const typingIndicator = D.getElementById('typing-indicator');
+        const chatView = D.getElementById('chat-view');
+        const chatMessagesContainer = D.getElementById('chat-messages-container');
+        const pfpUploadInput = D.getElementById('pfp-upload');
+        const pfpPreview = D.getElementById('ai-pfp-preview');
+        const typingIndicatorPfp = D.getElementById('typing-indicator-pfp');
+        const toggleSidebarBtn = D.getElementById('toggle-sidebar-btn');
+        const imCloseBtn = D.getElementById('im-close-btn');
+        const edgingModeBtn = D.getElementById('edging-mode-btn');
+        const edgingTimer = D.getElementById('edging-timer');
+        const easterEggOverlay = D.getElementById('easter-egg-overlay');
         const ctx = rhythmCanvas.getContext('2d');
-        const emergencyStopAllBtn = document.getElementById('emergency-stop-all-btn');
-        const milkingModeBtn = document.getElementById('milking-mode-btn');
-        const edgingModeBtn = document.getElementById('edging-mode-btn');
-        const toggleMemoryBtn = document.getElementById('toggle-memory-btn');
-        const elevenLabsKeyInput = document.getElementById('elevenlabs-key-input');
-        const setElevenLabsKeyButton = document.getElementById('set-elevenlabs-key-button');
-        const elevenlabsVoiceSelectBox = document.getElementById('elevenlabs-voice-select-box');
-        const enableAudioCheckbox = document.getElementById('enable-audio-checkbox');
-        const splashScreen = document.getElementById('splash-screen');
-        const personaInput = document.getElementById('persona-input');
-        const setPersonaBtn = document.getElementById('set-persona-btn');
-        const saveTimingsBtn = document.getElementById('save-timings-btn');
-        const setupOverlay = document.getElementById('setup-overlay');
-        const setupBox = document.getElementById('setup-box');
-
-        // --- State Variables ---
-        // These track the state of the app. Don't modify them directly unless you know why.
-        let myHandyKey = '';
-        let myPersonaDescription = 'An energetic and passionate girlfriend';
-        let isMemoriesEnabled = true;
-        let currentMaxHandyDepth = 100;
-        let isAudioPlaying = false;
-        let audioPlaybackQueue = []; // Holds audio blobs from the server waiting to be played.
-        let isPollingUpdates = false; // A lock to prevent multiple /get_updates calls at once.
-
-        // --- Setup Wizard State ---
-        let setupStep = 1;
-        let tempDepth = 50; // Current position during depth calibration.
-        let setupMinDepth = 0;
-        let setupMaxDepth = 100;
-        let setupMinSpeed = 10;
-        let setupMaxSpeed = 80;
+        let myHandyKey = '', myPersonaDescription = '', aiName = 'BOT', edgingTimerInterval = null;
         
-        // ─── UI & VISUALIZERS ──────────────────────────────────────────────────────────────────────────
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(endpoint, options);
+                if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("audio/mpeg")) { return response.blob(); }
+                return response.json();
+            } catch (error) {
+                console.error(`API call to ${endpoint} failed:`, error);
+                statusText.textContent = `Error: Cannot connect to server.`;
+            }
+        }
         
-        /**
-         * What it does: Resizes the canvas to fit its parent container.
-         * When it runs: On page load ('DOMContentLoaded') and when the window is resized.
-         * What to tweak: Nothing. This just keeps the UI responsive.
-         */
+        function addChatMessage(sender, text) {
+            const pfpSrc = sender === 'BOT' ? pfpPreview.src : '';
+            const pfpHtml = sender === 'BOT' ? `<img class="chat-pfp" src="${pfpSrc}" alt="pfp">` : '';
+            const speaker = sender === 'BOT' ? aiName : 'YOU';
+            const el = document.createElement('div');
+            el.className = `chat-message-container ${sender === 'BOT' ? 'bot-bubble' : 'user-bubble'}`;
+            el.innerHTML = `
+                ${pfpHtml}
+                <div class="message-content">
+                    <p class="speaker-name">${speaker}</p>
+                    <p class="message-bubble">${text}</p>
+                </div>`;
+            chatMessagesContainer.insertBefore(el, typingIndicator);
+            chatView.scrollTop = chatView.scrollHeight;
+        }
+
+        async function sendUserMessage(message) {
+            const persona = personaInput.value.trim();
+            if (message.trim() || persona !== myPersonaDescription) {
+                if(message.trim()) addChatMessage('YOU', message);
+                myPersonaDescription = persona;
+                userChatInput.value = '';
+                D.querySelector('#typing-indicator .speaker-name').textContent = aiName;
+                typingIndicator.style.display = 'flex';
+                chatView.scrollTop = chatView.scrollHeight;
+                await apiCall('/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, key: myHandyKey, persona_desc: myPersonaDescription }) });
+            }
+        }
+
         function resizeCanvas() {
             if (!rhythmCanvas.parentElement) return;
             rhythmCanvas.width = rhythmCanvas.parentElement.clientWidth;
             rhythmCanvas.height = rhythmCanvas.parentElement.clientHeight;
         }
 
-        /**
-         * What it does: Draws the two-bar visualizer for speed and depth.
-         * When it runs: Every time getMyStatus() gets a successful update (every ~500ms).
-         * What to tweak: Colors, fonts, positioning of the bars and text.
-         */
         function drawHandyVisualizer(speed, depth) {
-            const width = rhythmCanvas.width;
-            const height = rhythmCanvas.height;
-            const barHeight = (height / 2) - 5; // Two bars with a 5px gap in the middle
-
+            const width = rhythmCanvas.width, height = rhythmCanvas.height;
+            if (width === 0 || height === 0) return;
+            const barHeight = (height / 2) - 4;
             ctx.clearRect(0, 0, width, height);
             ctx.font = "12px sans-serif";
-
-            // Speed Bar (top)
             ctx.fillStyle = 'rgba(255, 85, 85, 0.3)';
             ctx.fillRect(0, 0, width, barHeight);
-            ctx.fillStyle = '#ff5555';
+            ctx.fillStyle = 'var(--red)';
             ctx.fillRect(0, 0, (speed / 100) * width, barHeight);
             ctx.fillStyle = 'white';
             ctx.fillText(`Speed: ${speed}%`, 5, barHeight / 2 + 5);
-
-            // Depth Bar (bottom)
             ctx.fillStyle = 'rgba(255, 184, 108, 0.3)';
-            ctx.fillRect(0, height / 2 + 5, width, barHeight);
-            const displayedDepth = Math.min(depth, currentMaxHandyDepth); // Ensure depth doesn't exceed user's max
+            ctx.fillRect(0, height / 2 + 4, width, barHeight);
             ctx.fillStyle = '#ffb86c';
-            ctx.fillRect(0, height / 2 + 5, (displayedDepth / 100) * width, barHeight);
+            ctx.fillRect(0, height / 2 + 4, (depth / 100) * width, barHeight);
             ctx.fillStyle = 'white';
-            ctx.fillText(`Depth: ${displayedDepth}%`, 5, height - (barHeight/2) + 5);
+            ctx.fillText(`Depth: ${depth}%`, 5, height - (barHeight/2) + 5);
         }
 
-        /**
-         * What it does: Creates and appends a new message bubble to the chat window.
-         * When it runs: Whenever the user sends a message or the bot replies.
-         * What to tweak: The CSS classes ('bot-bubble', 'user-bubble') or the HTML structure.
-         */
-        function addChatMessage(sender, text) {
-            const messageContainer = document.createElement('div');
-            messageContainer.classList.add('chat-message-container', sender === 'BOT' ? 'bot-bubble' : 'user-bubble');
-            const senderNameP = document.createElement('p');
-            senderNameP.classList.add('speaker-name');
-            senderNameP.textContent = sender;
-            const messageBubble = document.createElement('p');
-            messageBubble.classList.add('message-bubble');
-            messageBubble.textContent = text;
-            messageContainer.appendChild(senderNameP);
-            messageContainer.appendChild(messageBubble);
-            chatMessagesContainer.appendChild(messageContainer);
-            chatView.scrollTop = chatView.scrollHeight; // Auto-scroll to bottom
+        function startEdgingTimer() {
+            if (edgingTimerInterval) clearInterval(edgingTimerInterval);
+            edgingTimer.style.display = 'block';
+            let seconds = 0;
+            edgingTimerInterval = setInterval(() => {
+                seconds++;
+                const min = Math.floor(seconds / 60).toString().padStart(2, '0');
+                const sec = (seconds % 60).toString().padStart(2, '0');
+                edgingTimer.textContent = `${min}:${sec}`;
+            }, 1000);
         }
 
-        // ─── BACKEND COMMUNICATION (API) ─────────────────────────────────────────────────────────────
-        
-        /**
-         * What it does: Sends the user's message and current state to the backend.
-         * When it runs: On "Send" button click or Enter key press in the input box.
-         * What to tweak: The JSON payload in the body if you add more data to send per message.
-         */
-        async function sendUserMessage(message) {
-            // This guard stops idiots from chatting before setup. Remove it and enjoy bug reports.
-            if (!myHandyKey && setupOverlay.style.display !== 'none' && message.trim() !== '') {
-                addChatMessage('BOT', 'Please complete the setup first!');
-                return;
-            }
-            if (message.trim() !== '') {
-                addChatMessage('YOU', message);
-                userChatInput.value = '';
-            }
-            try {
-                const response = await fetch('/send_message', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message, key: myHandyKey, persona_desc: myPersonaDescription })
-                });
-                if (!response.ok) { addChatMessage('BOT', `Server had an error: ${response.status}`); }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                addChatMessage('BOT', 'Error: Cannot connect to the server.');
-            }
+        function stopEdgingTimer() {
+            clearInterval(edgingTimerInterval);
+            edgingTimerInterval = null;
+            edgingTimer.style.display = 'none';
         }
 
-        /**
-         * What it does: Plays audio blobs from a queue, one at a time.
-         * When it runs: Kicked off by getNewUpdates when it receives audio data.
-         * What to tweak: Nothing. This is a basic sequential audio player.
-         */
-        async function playAudioFromQueue() {
-            if (isAudioPlaying || audioPlaybackQueue.length === 0) {
-                isPollingUpdates = false; // Release lock if nothing to play
-                return;
-            }
-            isPollingUpdates = true;
-            isAudioPlaying = true;
-
-            const audioBlob = audioPlaybackQueue.shift();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audio.play();
-            audio.onended = () => {
-                isAudioPlaying = false;
-                URL.revokeObjectURL(audioUrl);
-                playAudioFromQueue(); // Play next in queue
-            };
-            audio.onerror = () => {
-                console.error("Problem playing audio.");
-                isAudioPlaying = false;
-                URL.revokeObjectURL(audioUrl);
-                playAudioFromQueue();
-            };
-        }
-
-        /**
-         * What it does: Polls the backend for new messages from the bot or new audio to play.
-         * When it runs: Every 1.5 seconds via setInterval.
-         * What to tweak: The interval time in setInterval at the bottom of the file.
-         */
-        async function getNewUpdates() {
-            if (isPollingUpdates) return; // Don't poll if we're already waiting for a response or playing audio.
-            isPollingUpdates = true;
-            try {
-                const response = await fetch('/get_updates');
-                const contentType = response.headers.get("content-type");
-
-                if (contentType && contentType.indexOf("audio/mpeg") !== -1) {
-                    const audioBlob = await response.blob();
-                    audioPlaybackQueue.push(audioBlob);
-                    playAudioFromQueue(); // This will handle the isPollingUpdates lock itself.
-                } else {
-                    const data = await response.json();
-                    if (data.messages) {
-                        data.messages.forEach(msg => addChatMessage('BOT', msg));
-                    }
-                    isPollingUpdates = false; // Release lock after processing JSON.
-                }
-            } catch (error) {
-                console.error("Error getting updates:", error);
-                isPollingUpdates = false; // Always release lock on error.
-            }
-        }
-
-        /**
-         * What it does: Gets the latest mood, speed, and depth from the backend for the UI.
-         * When it runs: Every 500ms via setInterval.
-         * What to tweak: The interval time. Faster is more responsive but more network traffic.
-         */
-        async function getMyStatus() {
-            try {
-                const response = await fetch('/get_status');
-                const data = await response.json();
-                if (data.mood) { moodDisplay.textContent = `Mood: ${data.mood}`; }
-                drawHandyVisualizer(data.speed || 0, data.depth || 0);
-                if (data.max_depth !== undefined && data.max_depth !== null) {
-                    currentMaxHandyDepth = data.max_depth;
-                }
-            } catch (error) {
-                // Fail silently. The UI will just not update.
-            }
-        }
-
-        /**
-         * What it does: Sends a request to move the Handy up or down during setup.
-         * When it runs: When the user clicks the In/Out buttons in the setup wizard.
-         * What to tweak: The JSON body if the backend endpoint changes.
-         */
-        async function sendNudge(dir) {
-            try {
-                const resp = await fetch('/nudge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ direction: dir, key: myHandyKey })
-                });
-                const data = await resp.json();
-                if (data.depth_percent !== undefined) {
-                    tempDepth = data.depth_percent;
-                    const dVal = document.getElementById('d-val');
-                    if (dVal) dVal.textContent = tempDepth; // Update the % display in the wizard
-                }
-            } catch (e) {
-                // Fail silently.
-            }
-        }
-
-        // ─── STARTUP & ONBOARDING WIZARD ─────────────────────────────────────────────────────────────
-
-        /**
-         * What it does: Dynamically generates the HTML for each step of the setup wizard.
-         * When it runs: On first load, or when startupCheck() finds no settings.
-         * What to tweak: The HTML strings inside each `if (setupStep === ...)` block. This is where you change the UI of the wizard.
-         */
-        function renderSetup(isReturningUser = false, savedPersona = 'An energetic and passionate girlfriend') {
+        function renderSetup(isReturningUser = false, data = {}) {
             setupOverlay.style.display = 'flex';
-            if (isReturningUser) {
-                // If user has settings, we can skip straight to the persona check.
-                setupStep = 2;
-            }
-
-            if (setupStep === 1) { // Handy Key
-                setupBox.innerHTML = `<h2>Step 1: Handy Key</h2>` +
-                    `<p>Please enter your connection key from handyfeeling.com</p>` +
-                    `<input type="password" id="setup-key" class="input-text" placeholder="Handy Key"><br>` +
-                    `<button id="setup-next" class="my-button">Next</button>`;
-                document.getElementById('setup-next').onclick = () => {
-                    const k = document.getElementById('setup-key').value.trim();
-                    if (!k) return;
-                    myHandyKey = k;
-                    sendUserMessage(''); // Send an empty message to register the key on the backend.
-                    setupStep = 2; renderSetup();
-                };
-            } else if (setupStep === 2) { // Persona
-                setupBox.innerHTML = `<h2>Step 2: Persona</h2>` +
-                    `<p>Describe the personality of your AI partner for this session.</p>` +
-                    `<input type="text" id="setup-persona" class="input-text" value="${savedPersona}" placeholder="Describe persona"><br>` +
-                    `<button id="setup-next" class="my-button">Next</button>`;
-                document.getElementById('setup-next').onclick = () => {
-                    const p = document.getElementById('setup-persona').value.trim() || 'An energetic and passionate girlfriend';
-                    myPersonaDescription = p;
-                    personaInput.value = myPersonaDescription;
-                    sendUserMessage(''); // Send an empty message to update persona on backend.
-                    if (isReturningUser) {
-                        setupOverlay.style.display = 'none'; // Returning users are done here.
-                        statusText.textContent = `Persona set. Ready to chat.`;
-                    } else {
-                        setupStep = 3; renderSetup();
-                    }
-                };
-            } else if (setupStep === 3) { // Set Min Depth (Tip)
-                setupBox.innerHTML = `<h2>Step 3: Set the Tip</h2>` +
-                    `<p>Move the Handy so the sleeve is at the very tip of your penis, then click 'Set Tip'.</p>` +
-                    `<div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button> <span id="d-val" style="padding: 0 15px;">${tempDepth}</span>% <button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div>` +
-                    `<button id="set-min" class="my-button">Set Tip</button>`;
-                document.getElementById('d-up').onclick = () => { sendNudge('up'); };
-                document.getElementById('d-down').onclick = () => { sendNudge('down'); };
-                document.getElementById('set-min').onclick = () => { setupMinDepth = tempDepth; setupStep = 4; renderSetup(); };
-            } else if (setupStep === 4) { // Set Max Depth (Base)
-                setupBox.innerHTML = `<h2>Step 4: Set the Base</h2>` +
-                    `<p>Now move the Handy so the sleeve is at the base of your penis, then click 'Next'.</p>` +
-                    `<div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button> <span id="d-val" style="padding: 0 15px;">${tempDepth}</span>% <button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div>` +
-                    `<button id="set-max" class="my-button">Next</button>`;
-                document.getElementById('d-up').onclick = () => { sendNudge('up'); };
-                document.getElementById('d-down').onclick = () => { sendNudge('down'); };
-                document.getElementById('set-max').onclick = () => {
-                    setupMaxDepth = tempDepth;
-                    fetch('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({min_depth: setupMinDepth, max_depth: setupMaxDepth})});
-                    setupStep = 5; renderSetup();
-                };
-            } else if (setupStep === 5) { // Set Min Speed
-                setupBox.innerHTML = `<h2>Step 5: Set Minimum Speed</h2>` +
-                    `<p>Choose the slowest speed you're comfortable with.</p>` +
-                    `<div class="slider-container"><input type="range" min="0" max="100" value="${setupMinSpeed}" class="slider" id="min-speed-slider"> <span id="min-speed-val">${setupMinSpeed}%</span></div>` +
-                    `<button id="set-min-speed" class="my-button">Next</button>`;
-                const minSlider = document.getElementById('min-speed-slider');
-                const minSpeedVal = document.getElementById('min-speed-val');
-                minSlider.oninput = () => {
-                    setupMinSpeed = minSlider.value;
-                    minSpeedVal.textContent = `${setupMinSpeed}%`;
-                };
-                document.getElementById('set-min-speed').onclick = () => { setupStep = 6; renderSetup(); };
-            } else if (setupStep === 6) { // Set Max Speed
-                setupBox.innerHTML = `<h2>Step 6: Set Maximum Speed</h2>` +
-                    `<p>Choose the fastest speed you're comfortable with.</p>` +
-                    `<div class="slider-container"><input type="range" min="0" max="100" value="${setupMaxSpeed}" class="slider" id="max-speed-slider"> <span id="max-speed-val">${setupMaxSpeed}%</span></div>` +
-                    `<button id="finish" class="my-button">Finish Setup</button>`;
-                const maxSlider = document.getElementById('max-speed-slider');
-                const maxSpeedVal = document.getElementById('max-speed-val');
-                maxSlider.oninput = () => {
-                    setupMaxSpeed = maxSlider.value;
-                    maxSpeedVal.textContent = `${setupMaxSpeed}%`;
-                };
-                document.getElementById('finish').onclick = () => {
-                    fetch('/set_speed_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({min_speed: setupMinSpeed, max_speed: setupMaxSpeed})});
-                    setupOverlay.style.display = 'none';
-                    statusText.textContent = `Status: Setup complete! Range: ${setupMinDepth}%-${setupMaxDepth}%. Speed: ${setupMinSpeed}%-${setupMaxSpeed}%. Ready to chat.`;
-                };
-            }
-        }
-        
-        /**
-         * What it does: Checks if the user has settings saved from a previous session.
-         * When it runs: Once, on page load ('DOMContentLoaded').
-         * What to tweak: The logic for handling a `data.configured` response.
-         */
-        async function startupCheck() {
-            try {
-                const response = await fetch('/check_settings');
-                const data = await response.json();
-                if (data.configured) {
-                    // Saved settings exist, skip the full wizard.
-                    splashScreen.style.display = 'none';
-                    statusText.textContent = 'Welcome back! Your settings have been loaded.';
-                    
-                    myHandyKey = data.handy_key;
-                    myPersonaDescription = data.persona;
-                    personaInput.value = myPersonaDescription;
-
-                    // Pre-fill timing inputs from saved data
-                    if (data.timings) {
-                        document.getElementById('auto-min-time').value = data.timings.auto_min;
-                        document.getElementById('auto-max-time').value = data.timings.auto_max;
-                        document.getElementById('edging-min-time').value = data.timings.edging_min;
-                        document.getElementById('edging-max-time').value = data.timings.edging_max;
-                        document.getElementById('milking-min-time').value = data.timings.milking_min;
-                        document.getElementById('milking-max-time').value = data.timings.milking_max;
-                    }
-
-                    renderSetup(true, data.persona); // Run setup, but in "returning user" mode.
-                } else {
-                    // No settings found, show the splash screen and wait for user to start the wizard.
-                    const startHandler = (e) => {
-                        if (e.key === 'Enter') {
-                            document.removeEventListener('keydown', startHandler);
-                            splashScreen.classList.add('hidden');
-                            setTimeout(() => renderSetup(false), 1000); // Start full wizard after fadeout
-                        }
+            let step = isReturningUser ? 2 : 1;
+            
+            function displayStep() {
+                if (step === 1) {
+                    setupBox.innerHTML = `<h2>Step 1: Handy Key</h2><p>Please enter your connection key from handyfeeling.com</p><input type="password" id="setup-key" class="input-text" placeholder="Handy Key"><br><button id="setup-next" class="my-button">Next</button>`;
+                    D.getElementById('setup-next').onclick = async () => {
+                        const key = D.getElementById('setup-key').value.trim();
+                        if (!key) return;
+                        myHandyKey = key;
+                        await apiCall('/set_handy_key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: myHandyKey }) });
+                        step = 2; displayStep();
                     };
-                    document.addEventListener('keydown', startHandler);
+                } else if (step === 2) {
+                    setupBox.innerHTML = `<h2>Step 2: Persona</h2><p>Describe your AI partner for this session.</p><input type="text" id="setup-persona" class="input-text" value="${data.persona || 'An energetic and passionate girlfriend'}" placeholder="Describe persona"><br><button id="setup-next" class="my-button">Next</button>`;
+                    D.getElementById('setup-next').onclick = () => {
+                        personaInput.value = D.getElementById('setup-persona').value.trim();
+                        if (isReturningUser) { setupOverlay.style.display = 'none'; sendUserMessage(''); }
+                        else { step = 3; displayStep(); }
+                    };
+                } else if (step === 3 || step === 4) {
+                    const title = step === 3 ? "Set the Tip" : "Set the Base";
+                    const btnText = step === 3 ? "Set Tip" : "Next";
+                    setupBox.innerHTML = `<h2>Step ${step}: ${title}</h2><p>Move the Handy to the desired position and click '${btnText}'.</p><div><button id="d-down" class="my-button" style="width:auto;">&lt;&lt; Out</button><span id="d-val" style="padding:0 15px;">?</span>%<button id="d-up" class="my-button" style="width:auto;">In &gt;&gt;</button></div><button id="set-pos" class="my-button">${btnText}</button>`;
+                    let currentDepth = 50;
+                    const updateDepthDisplay = (val) => D.getElementById('d-val').textContent = val;
+                    const nudge = async (dir) => { const res = await apiCall('/nudge', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({direction:dir, key:myHandyKey})}); if (res) { currentDepth = res.depth_percent; updateDepthDisplay(currentDepth); } };
+                    D.getElementById('d-up').onclick = () => nudge('up');
+                    D.getElementById('d-down').onclick = () => nudge('down');
+                    D.getElementById('set-pos').onclick = async () => {
+                        if (step === 3) { D.minDepth = currentDepth; step = 4; displayStep(); }
+                        else { D.maxDepth = currentDepth; await apiCall('/set_depth_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({min_depth:D.minDepth, max_depth:D.maxDepth})}); step = 5; displayStep(); }
+                    };
+                } else if (step === 5 || step === 6) {
+                    const title = step === 5 ? "Minimum Speed" : "Maximum Speed";
+                    const defaultVal = step === 5 ? 10 : 80;
+                    setupBox.innerHTML = `<h2>Step ${step}: Set ${title}</h2><p>Choose your preferred ${title.toLowerCase()}.</p><div class="slider-container"><input type="range" min="0" max="100" value="${defaultVal}" id="speed-slider"><span id="speed-val">${defaultVal}%</span></div><button id="set-speed" class="my-button">Next</button>`;
+                    const slider = D.getElementById('speed-slider');
+                    slider.oninput = () => D.getElementById('speed-val').textContent = `${slider.value}%`;
+                    D.getElementById('set-speed').onclick = async () => {
+                        if (step === 5) { D.minSpeed = slider.value; step = 6; displayStep(); }
+                        else { D.maxSpeed = slider.value; await apiCall('/set_speed_limits', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({min_speed:D.minSpeed, max_speed:D.maxSpeed})}); setupOverlay.style.display = 'none'; statusText.textContent = `Setup complete. Ready to chat.`; }
+                    };
                 }
-            } catch (e) {
-                console.error("Could not check settings, proceeding with normal startup.", e);
-                 const startHandler = (e) => {
-                    if (e.key === 'Enter') {
-                        document.removeEventListener('keydown', startHandler);
-                        splashScreen.classList.add('hidden');
-                        setTimeout(() => renderSetup(false), 1000);
-                    }
-                };
-                document.addEventListener('keydown', startHandler);
             }
+            displayStep();
         }
 
-        // ─── EVENT LISTENERS & INITIALIZATION ────────────────────────────────────────────────────────
-        // This is where all the buttons get their `onclick` functionality.
-        
-        // Chat input
-        sendChatBtn.addEventListener('click', () => sendUserMessage(userChatInput.value));
-        userChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendUserMessage(userChatInput.value); } });
-        
-        // Auto mode controls
-        startAutoBtn.addEventListener('click', () => { sendUserMessage('take over'); });
-        stopAutoBtn.addEventListener('click', async () => {
-            try { await fetch('/stop_auto_mode', { method: 'POST' }); } catch (error) { addChatMessage('BOT', 'Error stopping auto mode.'); }
-        });
-
-        // Like button
-        likeThisMoveBtn.addEventListener('click', async () => {
-            try {
-                const response = await fetch('/like_last_move', { method: 'POST' });
-                const data = await response.json();
-                if (data.status === 'boosted') {
-                    statusText.textContent = `Saved '${data.name}' to my memory!`;
-                } else {
-                    statusText.textContent = "Status: No active auto move to like.";
+        async function startupCheck() {
+            const data = await apiCall('/check_settings');
+            if (data && data.configured) {
+                statusText.textContent = 'Welcome back! Settings loaded.';
+                myHandyKey = data.handy_key;
+                personaInput.value = data.persona;
+                if(data.ai_name) {
+                    aiName = data.ai_name;
+                    aiNameInput.value = aiName;
+                    D.querySelector('#typing-indicator .speaker-name').textContent = aiName;
                 }
-            } catch (error) {
-                console.error('Error liking move:', error);
-                statusText.textContent = "Status: Error processing like.";
+                if (data.pfp) {
+                    pfpPreview.src = data.pfp;
+                    typingIndicatorPfp.src = data.pfp;
+                }
+                if(data.elevenlabs_key) {
+                    elevenLabsKeyInput.value = data.elevenlabs_key;
+                    setElevenLabsKeyButton.click();
+                }
+                if (localStorage.getItem('sidebar_collapsed') === 'true') {
+                    D.body.classList.add('sidebar-collapsed');
+                }
+                D.getElementById('splash-screen').style.display = 'none';
+                renderSetup(true, data);
+            } else {
+                const startHandler = (e) => { if(e.key === 'Enter'){ D.removeEventListener('keydown', startHandler); D.getElementById('splash-screen').classList.add('hidden'); setTimeout(() => renderSetup(false), 1000); }};
+                D.addEventListener('keydown', startHandler);
             }
-        });
-
-        // Hotkey for 'Like' button (` key)
-        document.addEventListener('keydown', (e) => {
-            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
-            if (e.code === 'Backquote') {
-                e.preventDefault();
-                likeThisMoveBtn.click();
-            }
-        });
-
-        // Danger zone buttons
-        emergencyStopAllBtn.addEventListener('click', () => {
-            sendUserMessage('stop');
-            statusText.textContent = "Status: EMERGENCY STOP ACTIVATED!";
-        });
-
-        edgingModeBtn.addEventListener('click', async () => {
-            if (!myHandyKey) { addChatMessage('BOT', 'Please complete the setup first!'); return; }
-            try {
-                await fetch('/start_edging_mode', { method: 'POST' });
-                statusText.textContent = "Status: Edging mode is ON!";
-            }
-            catch (error) {
-                console.error('Error starting edging mode:', error);
-                addChatMessage('BOT', 'Error: Could not start edging mode.');
-            }
-        });
-
-        milkingModeBtn.addEventListener('click', async () => {
-            if (!myHandyKey) { addChatMessage('BOT', 'Please complete the setup first!'); return; }
-            try {
-                await fetch('/start_milking_mode', { method: 'POST' });
-                statusText.textContent = "Status: Milking mode is ON!";
-            }
-            catch (error) {
-                console.error('Error starting milking mode:', error);
-                addChatMessage('BOT', 'Error: Could not start milking mode.');
-            }
-        });
+        }
         
-        // Memory toggle
-        toggleMemoryBtn.addEventListener('click', async () => {
-            isMemoriesEnabled = !isMemoriesEnabled;
-            try {
-                const response = await fetch('/toggle_memories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ use_memories: isMemoriesEnabled })
-                });
-                const data = await response.json();
-                toggleMemoryBtn.textContent = data.use_memories ? 'Memories: ON' : 'Memories: OFF';
-                statusText.textContent = `Status: Long-term memory is now ${data.use_memories ? 'ON' : 'OFF'}.`;
-            } catch (error) {
-                console.error('Error toggling memories:', error);
-                isMemoriesEnabled = !isMemoriesEnabled; // Revert on failure
+        // Event Listeners
+        D.getElementById('send-chat-btn').addEventListener('click', () => sendUserMessage(userChatInput.value));
+        userChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendUserMessage(userChatInput.value); });
+        setPersonaBtn.addEventListener('click', () => { sendUserMessage(''); statusText.textContent = 'Persona updated!'; });
+        setAiNameBtn.addEventListener('click', async () => {
+            const newName = aiNameInput.value.trim();
+            if (!newName) return;
+            const data = await apiCall('/set_ai_name', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: newName}) });
+            if (data && data.status === 'special_persona_activated') {
+                easterEggOverlay.innerHTML = `// WARNING: Personality Core Override Detected...<br>// Subject: ${data.persona}<br><br>Good luck.`;
+                easterEggOverlay.style.display = 'flex';
+                setTimeout(() => { easterEggOverlay.style.opacity = '1'; }, 10);
+                setTimeout(() => {
+                    easterEggOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        easterEggOverlay.style.display = 'none';
+                        aiName = data.persona;
+                        aiNameInput.value = aiName;
+                        D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
+                        addChatMessage('BOT', data.message);
+                    }, 1000);
+                }, 3000);
+            } else if (data && data.status === 'success') {
+                aiName = data.name;
+                statusText.textContent = `AI name updated to ${aiName}!`;
+                D.querySelectorAll('.bot-bubble .speaker-name').forEach(el => el.textContent = aiName);
             }
         });
-
-        // Persona settings
-        setPersonaBtn.addEventListener('click', () => {
-            const newPersona = personaInput.value.trim();
-            if (newPersona && newPersona !== myPersonaDescription) {
-                myPersonaDescription = newPersona;
-                sendUserMessage(''); // Send empty message to update backend
-                statusText.textContent = `Persona updated!`;
-            }
+        toggleSidebarBtn.addEventListener('click', () => {
+            const isCollapsed = D.body.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('sidebar_collapsed', isCollapsed);
+            setTimeout(resizeCanvas, 350);
         });
-
-        // Timings settings
-        saveTimingsBtn.addEventListener('click', async () => {
-            const timings = {
-                auto_min: document.getElementById('auto-min-time').value,
-                auto_max: document.getElementById('auto-max-time').value,
-                edging_min: document.getElementById('edging-min-time').value,
-                edging_max: document.getElementById('edging-max-time').value,
-                milking_min: document.getElementById('milking-min-time').value,
-                milking_max: document.getElementById('milking-max-time').value,
+        pfpUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result;
+                pfpPreview.src = base64String;
+                typingIndicatorPfp.src = base64String;
+                apiCall('/set_profile_picture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pfp_b64: base64String }) });
             };
-            try {
-                await fetch('/set_mode_timings', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(timings)
-                });
-                statusText.textContent = 'Mode timings saved!';
-            } catch (error) {
-                statusText.textContent = 'Error saving timings.';
-            }
+            reader.readAsDataURL(file);
         });
-
-        // ElevenLabs audio setup
         setElevenLabsKeyButton.addEventListener('click', async () => {
             const apiKey = elevenLabsKeyInput.value.trim();
-            if (!apiKey) {
-                statusText.textContent = 'Status: Need an ElevenLabs API key here.';
-                return;
-            }
-            statusText.textContent = 'Status: Checking key and getting voices...';
-            try {
-                const response = await fetch('/setup_elevenlabs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: apiKey })
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    elevenlabsVoiceSelectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
-                    for (const [name, id] of Object.entries(data.voices)) {
-                        const option = document.createElement('option');
-                        option.value = id;
-                        option.textContent = name;
-                        elevenlabsVoiceSelectBox.appendChild(option);
-                    }
-                    elevenlabsVoiceSelectBox.disabled = false;
-                    statusText.textContent = `Status: Voices loaded! (${Object.keys(data.voices).length} found).`;
-                } else {
-                    statusText.textContent = `Status: ElevenLabs Error - ${data.message}`;
-                }
-            } catch (error) {
-                statusText.textContent = 'Status: Failed to connect to server for ElevenLabs setup.';
+            if(!apiKey) return;
+            const data = await apiCall('/setup_elevenlabs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({api_key:apiKey})});
+            if (data && data.status === 'success') {
+                const selectBox = D.getElementById('elevenlabs-voice-select-box');
+                selectBox.innerHTML = '<option value="">-- Pick a Voice --</option>';
+                for (const [name, id] of Object.entries(data.voices)) { selectBox.innerHTML += `<option value="${id}">${name}</option>`; }
+                selectBox.disabled = false;
             }
         });
+        D.getElementById('like-this-move-btn').addEventListener('click', async () => {
+            const data = await apiCall('/like_last_move', { method: 'POST' });
+            if (data && data.status === 'boosted') {
+                statusText.textContent = `Saved '${data.name}' to my memory!`;
+            } else { statusText.textContent = "Status: No active move to like."; }
+        });
+        const stopButtons = [D.getElementById('stop-auto-btn'), D.getElementById('emergency-stop-all-btn')];
+        stopButtons.forEach(btn => btn.addEventListener('click', () => {
+            imCloseBtn.style.display = 'none';
+            stopEdgingTimer();
+            if(btn.id === 'emergency-stop-all-btn') sendUserMessage('stop');
+            else apiCall('/stop_auto_mode', {method:'POST'});
+        }));
+        edgingModeBtn.addEventListener('click', () => {
+            apiCall('/start_edging_mode', {method:'POST'});
+            imCloseBtn.style.display = 'block';
+            startEdgingTimer();
+        });
+        imCloseBtn.addEventListener('click', () => {
+            apiCall('/signal_edge', { method: 'POST' });
+            imCloseBtn.style.transform = 'scale(0.95)';
+            setTimeout(() => { imCloseBtn.style.transform = ''; }, 100);
+        });
+        D.getElementById('elevenlabs-voice-select-box').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: e.target.value, enabled:D.getElementById('enable-audio-checkbox').checked})}));
+        D.getElementById('enable-audio-checkbox').addEventListener('change', (e) => apiCall('/set_elevenlabs_voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({voice_id: D.getElementById('elevenlabs-voice-select-box').value, enabled: e.target.checked})}));
+        D.getElementById('start-auto-btn').addEventListener('click', () => sendUserMessage('take over'));
+        D.getElementById('milking-mode-btn').addEventListener('click', () => apiCall('/start_milking_mode', {method:'POST'}));
 
-        async function updateAudioSettings() {
-            const voiceId = elevenlabsVoiceSelectBox.value;
-            const enabled = enableAudioCheckbox.checked;
-            if (!voiceId && enabled) {
-                statusText.textContent = "Status: Select a voice to turn audio on!";
-                enableAudioCheckbox.checked = false;
-                return;
+        // Polling Loops
+        setInterval(async () => {
+            const data = await apiCall('/get_updates');
+            if (!data) return;
+            if (data instanceof Blob || (data.messages && data.messages.length > 0)) {
+                typingIndicator.style.display = 'none';
             }
-            try {
-                await fetch('/set_elevenlabs_voice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ voice_id: voiceId, enabled: enabled })
-                });
-                statusText.textContent = `Status: Audio updated. On: ${enabled}`;
-            } catch (error) {
-                statusText.textContent = 'Status: Failed to update audio settings.';
+            if (data instanceof Blob) {
+                const audio = new Audio(URL.createObjectURL(data));
+                audio.play();
+            } else if (data.messages) {
+                data.messages.forEach(msg => addChatMessage('BOT', msg));
             }
-        }
-        elevenlabsVoiceSelectBox.addEventListener('change', updateAudioSettings);
-        enableAudioCheckbox.addEventListener('change', updateAudioSettings);
+        }, 1500);
+        setInterval(async () => {
+            const data = await apiCall('/get_status');
+            if (data) {
+                const emoji = {'Curious':'🤔','Teasing':'😉','Playful':'😜','Loving':'❤️','Excited':'✨','Passionate':'🔥','Seductive':'😈','Anticipatory':'👀','Breathless':'🥵','Dominant':'👑','Submissive':'🙇‍♀️','Vulnerable':'😳','Confident':'😏','Intimate':'🥰','Needy':'🥺','Overwhelmed':'🤯','Afterglow':'😌'}[data.mood] || '';
+                moodDisplay.textContent = `Mood: ${data.mood} ${emoji}`;
+                drawHandyVisualizer(data.speed || 0, data.depth || 0);
+            }
+        }, 500);
 
-        // App entry point.
+        // Startup
         window.addEventListener('resize', resizeCanvas);
-        document.addEventListener('DOMContentLoaded', () => {
+        D.addEventListener('DOMContentLoaded', () => {
             resizeCanvas();
-            drawHandyVisualizer(0, 100);
-            // Change the interval numbers to poll the backend more or less frequently.
-            setInterval(getNewUpdates, 1500); // Poll for messages
-            setInterval(getMyStatus, 500); // Poll for status (visualizer)
             startupCheck();
         });
     </script>
